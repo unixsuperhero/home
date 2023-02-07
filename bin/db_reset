@@ -1,0 +1,5 @@
+#!/bin/bash
+
+sed -I '' '/demo_billers = {/,/}/s/true/false/;s/\(grove_distro_biller:.*\)false/\1true/' db/seeds.rb
+rake db:reset
+git checkout db/seeds.rb

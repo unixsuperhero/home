@@ -1,0 +1,18 @@
+#!/bin/bash
+
+display_git_prompt_info() {
+  git log -0 &>/dev/null
+
+  if test $? -eq 0
+  then
+    if test $(git status -s 2>/dev/null | wc -l) -gt 0
+    then
+      printf '%%{\e[1;31m%%}%s%%{\e[0m%%}' $(git cb) 
+    else
+      printf '%%{\e[1;32m%%}%s%%{\e[0m%%}' $(git cb) 
+    fi
+  fi
+}
+
+display_git_prompt_info 2>/dev/null
+

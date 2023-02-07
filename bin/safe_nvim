@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ -z $VIM ]; then
+  nvim "$@"
+else
+  echo "args: $@"
+  echo 'Do not nest vim windows...'
+fi

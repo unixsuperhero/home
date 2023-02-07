@@ -1,0 +1,14 @@
+#!/bin/bash
+
+function connect_to_pod() {
+  pod_name=${1:-rails}
+  cluster_name=${2:-$pod_name}
+  pod=$(kubectl get pods | rg "dadesystems-${pod_name}-staging" | head -3 | tail -1 | sed 's/[[:space:]].*//')
+
+  echo "POD: $pod"
+
+  kubectl exec -i -t -n default $pod -c $cluster_name -- sh -c "clear; bash -c 'doppler run -- rails c'"
+}
+
+connect_to_pod "$@"
+
