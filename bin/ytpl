@@ -1,0 +1,10 @@
+#!/bin/bash
+
+function dlvid() {
+  cd $HOME/Downloads/yt
+
+  youtube-dl "$@" -c -w --write-sub --write-auto-sub
+}
+
+dlvid "$@"
+

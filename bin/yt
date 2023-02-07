@@ -1,0 +1,10 @@
+#!/bin/bash
+
+function dlvid() {
+  cd $HOME/Downloads/yt
+
+  youtube-dl "$1" --no-playlist
+}
+
+dlvid "$@"
+
