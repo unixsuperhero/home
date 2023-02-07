@@ -1,0 +1,20 @@
+# This is Git's per-user configuration file.
+[user]
+# Please adapt and uncomment the following lines:
+name = Joshua Toyota
+email = jearsh@gmail.com
+
+[alias]
+  aa = add --all
+  cb = branch --show-current
+  c = commit -m
+  lod = log --oneline --decorate
+  lodd = log --oneline --decorate -10
+  dd = diff development --name-only --diff-filter=d
+  conflicts = diff development --name-only --diff-filter=U
+  lsm = diff master --name-only --diff-filter=d
+  b = branch
+  pod = pull origin development
+  pom = pull origin master
+[init]
+	defaultBranch = main
