@@ -78,3 +78,4 @@ proj/
 ruby/
 sftp-dest/
 work/
+Brewfile.lock.json
