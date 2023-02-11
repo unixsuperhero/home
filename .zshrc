@@ -60,7 +60,7 @@ alias gbs="gb | sed 's/.*[[:space:]]//' | sk"
 
 alias sc="bin/rails c"
 alias ss="bin/rails s"
-alias wkr="QUEUE=* bundle exec rake resque:work"
+alias wkr='(unset DADE_NEXT; QUEUE=* bundle exec rake resque:work)'
 
 alias ezs="vim ~/.zshrc"
 alias .zs="source ~/.zshrc"

@@ -9,8 +9,10 @@ Plug 'tpope/vim-rails'
 Plug 'tpope/vim-unimpaired'
 Plug 'tpope/vim-eunuch'
 Plug 'tpope/vim-rsi'
-" Plug 'adelarsq/vim-matchit'
+Plug 'adelarsq/vim-matchit'
 Plug 'vim-ruby/vim-ruby'
+Plug 'kana/vim-textobj-user'
+Plug 'nelstrom/vim-textobj-rubyblock'
 
 if has("nvim")
   Plug 'kristijanhusak/defx-git'
@@ -237,3 +239,4 @@ nnoremap <silent> g] <cmd>lua vim.diagnostic.goto_next()<CR>
 
 
 hi LineNr cterm=bold gui=bold guifg=#a9b1d6
+hi Comment cterm=bold gui=bold guifg=#a9b1d6
