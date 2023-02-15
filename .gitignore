@@ -63,3 +63,4 @@ ruby/
 sftp-dest/
 work/
 Brewfile.lock.json
+.config/exercism/

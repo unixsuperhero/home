@@ -6,14 +6,15 @@ email = jearsh@gmail.com
 
 [alias]
   aa = add --all
-  cb = branch --show-current
+  amend = commit --amend --no-edit
+  b = branch
   c = commit -m
+  cb = branch --show-current
+  conflicts = diff development --name-only --diff-filter=U
+  dd = diff development --name-only --diff-filter=d
   lod = log --oneline --decorate
   lodd = log --oneline --decorate -10
-  dd = diff development --name-only --diff-filter=d
-  conflicts = diff development --name-only --diff-filter=U
   lsm = diff master --name-only --diff-filter=d
-  b = branch
   pod = pull origin development
   pom = pull origin master
 [init]

@@ -13,6 +13,7 @@ Plug 'adelarsq/vim-matchit'
 Plug 'vim-ruby/vim-ruby'
 Plug 'kana/vim-textobj-user'
 Plug 'nelstrom/vim-textobj-rubyblock'
+Plug 'godlygeek/tabular'
 
 if has("nvim")
   Plug 'kristijanhusak/defx-git'
