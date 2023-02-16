@@ -3,6 +3,7 @@
 brew 'neovim'
 brew 'ripgrep'
 brew 'sk'
+brew 'exa'
 brew 'nushell'
 brew 'z'
 brew 'rbenv'
