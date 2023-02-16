@@ -49,6 +49,7 @@ alias specs="rg _spec"
 alias rubies="rg '[.]rb$'"
 alias ber="bundle exec rspec"
 alias bers="bundle exec rspec \$(gddev | specs)"
+alias berof="bundle exec rspec --only-failures"
 alias dirty="bundle exec rspec \$(gss | specs)"
 
 function gddev {

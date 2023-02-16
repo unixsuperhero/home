@@ -23,7 +23,7 @@ if has("nvim")
   Plug 'glepnir/lspsaga.nvim'
   Plug 'folke/lsp-colors.nvim'
   Plug 'folke/tokyonight.nvim'
-  Plug 'nvim-lua/completion-nvim'
+  " Plug 'nvim-lua/completion-nvim'
   " Plug 'nvim-treesitter/nvim-treesitter', { 'do': ':TSUpdate' }
   Plug 'kyazdani42/nvim-web-devicons'
   Plug 'nvim-lua/popup.nvim'
@@ -41,18 +41,18 @@ Plug 'neovim/nvim-lspconfig'
 Plug 'nvim-lua/lsp_extensions.nvim'
 
 " Autocompletion framework
-Plug 'hrsh7th/nvim-cmp'
+" Plug 'hrsh7th/nvim-cmp'
 " cmp LSP completion
-Plug 'hrsh7th/cmp-nvim-lsp'
+" Plug 'hrsh7th/cmp-nvim-lsp'
 " cmp Snippet completion
-Plug 'hrsh7th/cmp-vsnip'
+" Plug 'hrsh7th/cmp-vsnip'
 " cmp Path completion
-Plug 'hrsh7th/cmp-path'
-Plug 'hrsh7th/cmp-buffer'
+" Plug 'hrsh7th/cmp-path'
+" Plug 'hrsh7th/cmp-buffer'
 " See hrsh7th other plugins for more great completion sources!
 
 " Snippet engine
-Plug 'hrsh7th/vim-vsnip'
+" Plug 'hrsh7th/vim-vsnip'
 
 " Some color scheme other then default
 endif
@@ -189,39 +189,39 @@ nnoremap <silent> ga    <cmd>lua vim.lsp.buf.code_action()<CR>
 
 " Setup Completion
 " See https://github.com/hrsh7th/nvim-cmp#basic-configuration
-lua <<EOF
-local cmp = require'cmp'
-cmp.setup({
-  snippet = {
-    expand = function(args)
-        vim.fn["vsnip#anonymous"](args.body)
-    end,
-  },
-  mapping = {
-    ['<C-p>'] = cmp.mapping.select_prev_item(),
-    ['<C-n>'] = cmp.mapping.select_next_item(),
-    -- Add tab support
-    ['<S-Tab>'] = cmp.mapping.select_prev_item(),
-    ['<Tab>'] = cmp.mapping.select_next_item(),
-    ['<C-d>'] = cmp.mapping.scroll_docs(-4),
-    ['<C-f>'] = cmp.mapping.scroll_docs(4),
-    ['<C-Space>'] = cmp.mapping.complete(),
-    ['<C-e>'] = cmp.mapping.close(),
-    ['<CR>'] = cmp.mapping.confirm({
-      behavior = cmp.ConfirmBehavior.Insert,
-      select = true,
-    })
-  },
-
-  -- Installed sources
-  sources = {
-    { name = 'nvim_lsp' },
-    { name = 'vsnip' },
-    { name = 'path' },
-    { name = 'buffer' },
-  },
-})
-EOF
+" lua <<EOF
+" local cmp = require'cmp'
+" cmp.setup({
+"   snippet = {
+"     expand = function(args)
+"         vim.fn["vsnip#anonymous"](args.body)
+"     end,
+"   },
+"   mapping = {
+"     ['<C-p>'] = cmp.mapping.select_prev_item(),
+"     ['<C-n>'] = cmp.mapping.select_next_item(),
+"     -- Add tab support
+"     ['<S-Tab>'] = cmp.mapping.select_prev_item(),
+"     ['<Tab>'] = cmp.mapping.select_next_item(),
+"     ['<C-d>'] = cmp.mapping.scroll_docs(-4),
+"     ['<C-f>'] = cmp.mapping.scroll_docs(4),
+"     ['<C-Space>'] = cmp.mapping.complete(),
+"     ['<C-e>'] = cmp.mapping.close(),
+"     ['<CR>'] = cmp.mapping.confirm({
+"       behavior = cmp.ConfirmBehavior.Insert,
+"       select = true,
+"     })
+"   },
+" 
+"   -- Installed sources
+"   sources = {
+"     { name = 'nvim_lsp' },
+"     { name = 'vsnip' },
+"     { name = 'path' },
+"     { name = 'buffer' },
+"   },
+" })
+" EOF
 
 " have a fixed column for the diagnostics to appear in
 " this removes the jitter when warnings/errors flow in
