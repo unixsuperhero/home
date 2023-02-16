@@ -19,7 +19,7 @@ autoload -U edit-command-line
 zle -N edit-command-line
 bindkey '^x^e' edit-command-line
 
-alias ls="ls -l"
+alias ls="exa -l"
 alias mdb="rake db:migrate; RAILS_ENV=test rake db:migrate"
 
 alias g="git"
