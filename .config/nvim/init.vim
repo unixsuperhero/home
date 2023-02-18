@@ -41,14 +41,14 @@ Plug 'neovim/nvim-lspconfig'
 Plug 'nvim-lua/lsp_extensions.nvim'
 
 " Autocompletion framework
-" Plug 'hrsh7th/nvim-cmp'
+Plug 'hrsh7th/nvim-cmp'
 " cmp LSP completion
-" Plug 'hrsh7th/cmp-nvim-lsp'
+Plug 'hrsh7th/cmp-nvim-lsp'
 " cmp Snippet completion
 " Plug 'hrsh7th/cmp-vsnip'
 " cmp Path completion
-" Plug 'hrsh7th/cmp-path'
-" Plug 'hrsh7th/cmp-buffer'
+Plug 'hrsh7th/cmp-path'
+Plug 'hrsh7th/cmp-buffer'
 " See hrsh7th other plugins for more great completion sources!
 
 " Snippet engine
@@ -143,7 +143,7 @@ lua <<EOF
 local nvim_lsp = require'lspconfig'
 
 local capabilities = vim.lsp.protocol.make_client_capabilities()
-capabilities.textDocument.completion.completionItem.snippetSupport = true
+-- capabilities.textDocument.completion.completionItem.snippetSupport = true
 
 -- Enable rust_analyzer
 nvim_lsp.rust_analyzer.setup({
@@ -189,55 +189,27 @@ nnoremap <silent> ga    <cmd>lua vim.lsp.buf.code_action()<CR>
 
 " Setup Completion
 " See https://github.com/hrsh7th/nvim-cmp#basic-configuration
-" lua <<EOF
-" local cmp = require'cmp'
-" cmp.setup({
-"   snippet = {
-"     expand = function(args)
-"         vim.fn["vsnip#anonymous"](args.body)
-"     end,
-"   },
-"   mapping = {
-"     ['<C-p>'] = cmp.mapping.select_prev_item(),
-"     ['<C-n>'] = cmp.mapping.select_next_item(),
-"     -- Add tab support
-"     ['<S-Tab>'] = cmp.mapping.select_prev_item(),
-"     ['<Tab>'] = cmp.mapping.select_next_item(),
-"     ['<C-d>'] = cmp.mapping.scroll_docs(-4),
-"     ['<C-f>'] = cmp.mapping.scroll_docs(4),
-"     ['<C-Space>'] = cmp.mapping.complete(),
-"     ['<C-e>'] = cmp.mapping.close(),
-"     ['<CR>'] = cmp.mapping.confirm({
-"       behavior = cmp.ConfirmBehavior.Insert,
-"       select = true,
-"     })
-"   },
-" 
-"   -- Installed sources
-"   sources = {
-"     { name = 'nvim_lsp' },
-"     { name = 'vsnip' },
-"     { name = 'path' },
-"     { name = 'buffer' },
-"   },
-" })
-" EOF
+lua <<EOF
+local cmp = require'cmp'
+cmp.setup({
+  sources = {
+    { name = 'path' },
+    { name = 'buffer' },
+  },
+})
+EOF
 
-" have a fixed column for the diagnostics to appear in
-" this removes the jitter when warnings/errors flow in
-set signcolumn=yes
-
-" Set updatetime for CursorHold
-" 300ms of no cursor movement to trigger CursorHold
 set updatetime=300
-" Show diagnostic popup on cursor hover
-autocmd CursorHold * lua vim.diagnostic.open_float(nil, { focusable = false })
-
-
-" Goto previous/next diagnostic warning/error
-nnoremap <silent> g[ <cmd>lua vim.diagnostic.goto_prev()<CR>
-nnoremap <silent> g] <cmd>lua vim.diagnostic.goto_next()<CR>
-
 
 hi LineNr cterm=bold gui=bold guifg=#a9b1d6
 hi Comment cterm=bold gui=bold guifg=#a9b1d6
+
+nnoremap <silent> g[ <cmd>lua vim.diagnostic.goto_prev()<CR>
+nnoremap <silent> g] <cmd>lua vim.diagnostic.goto_next()<CR>
+
+augroup rust
+  au!
+  au FileType rust setlocal makeprg=cargo\ build
+  au FileType rust nmap <space>r <cmd>T cargo run %<cr>
+augroup END
+

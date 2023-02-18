@@ -11,9 +11,9 @@ select = "underline"
 [editor.file-picker]
 hidden = false
 
-[keys.normal.space]
-w = ":write"
-q = ":quit"
+[keys.normal]
+space.w = ":write"
+space.q = ":quit"
 
 [keys.insert]
 up = "no_op"

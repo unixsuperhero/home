@@ -30,6 +30,7 @@ alias gc="git commit"
 alias gco="git checkout"
 alias gd="git diff"
 alias gdc="git diff --cached"
+alias gdd="gddev"
 alias gkl="git clean -fd"
 alias glod="git log --oneline --decorate"
 alias glodd="git log --oneline --decorate -10"
@@ -116,3 +117,11 @@ export LDFLAGS="-L/opt/homebrew/opt/openssl@1.1/lib"
 export CPPFLAGS="-I/opt/homebrew/opt/openssl@1.1/include"
 export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@1.1/lib/pkgconfig"
 export RUBY_CONFIGURE_OPTS="--with-openssl-dir=/opt/homebrew/opt/openssl@1.1"
+
+alias wo="timer 30m && terminal-notifier -message 'Pomodoro'\
+        -title 'Work Timer is up! Take a Break 😊'\
+        -sound Crystal"
+
+alias br="timer 10m && terminal-notifier -message 'Pomodoro'\
+        -title 'Break is over! Get back to work 😬'\
+        -sound Crystal"
