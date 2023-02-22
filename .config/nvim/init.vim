@@ -112,8 +112,9 @@ nmap ,T :T bundle exec rspec <c-r>=expand('%')<cr>:<c-r>=line('.')<cr><cr>
 nmap <expr> ,s execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), '<\cr>a'], ''), '\\', '', 'g'))
 nmap <expr> ,S execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), ':', line('.'), '<\cr>a'], ''), '\\', '', 'g'))
 
-nnoremap ,r :il/\<\(module\\|class\\|def\)\> /<cr>
-nnoremap ,R :il/\<\(describe\\|context\\|it\)\>/<cr>
+nnoremap ,r <cmd>!cat -n % \| rg '\b(module\|class\|def)\b'<cr>
+nnoremap ,R <cmd>!cat -n % \| rg '\b(context\|it\|describe)\b'<cr>
+nnoremap ,L <cmd>!cat -n % \| rg '\b(context\|it\|describe\|let)\b'<cr>
 
 nnoremap ,, <c-^>
 
