@@ -1,6 +1,8 @@
 setopt EXTENDED_GLOB
 setopt PROMPT_VARS
 
+export WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
+
 . /opt/homebrew/opt/asdf/libexec/asdf.sh
 . $(brew --prefix)/etc/profile.d/z.sh
 
