@@ -107,14 +107,14 @@ nnoremap cob :set buftype=nofile<cr>
 nnoremap col :set invlist<cr>
 nnoremap cow :set invwrap<cr>
 
-nmap ,t <cmd>T bundle exec rspec %<cr>
+nmap ,t :T bundle exec rspec %<cr>
 nmap ,T :T bundle exec rspec <c-r>=expand('%')<cr>:<c-r>=line('.')<cr><cr>
 nmap <expr> ,s execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), '<\cr>a'], ''), '\\', '', 'g'))
 nmap <expr> ,S execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), ':', line('.'), '<\cr>a'], ''), '\\', '', 'g'))
 
-nnoremap ,r <cmd>!cat -n % \| rg '\b(module\|class\|def)\b'<cr>
-nnoremap ,R <cmd>!cat -n % \| rg '\b(context\|it\|describe)\b'<cr>
-nnoremap ,L <cmd>!cat -n % \| rg '\b(context\|it\|describe\|let)\b'<cr>
+nnoremap ,r <cmd>T cat -n % \| rg '\b(module\|class\|def)\b'<cr>
+nnoremap ,R <cmd>T cat -n % \| rg '\b(context\|it\|describe)\b'<cr>
+nnoremap ,L <cmd>T cat -n % \| rg '\b(context\|it\|describe\|let)\b'<cr>
 
 nnoremap ,, <c-^>
 
@@ -130,13 +130,7 @@ iabbrev sao save_and_open_page
 cabbrev V vert
 cabbrev vb vert sb
 
-" cabbrev job lib/dade/resque
-" cabbrev jobs spec/dade/resque
-
-command! -nargs=* T split | wincmd J | terminal <args>
-command! -nargs=* VT vsplit | wincmd L | terminal <args>
-
-" autocmd BufWritePre * :%s/\s\+$//e
+command! -nargs=* T split | wincmd J | terminal <args>; zsh -i
 
 lua <<EOF
 
@@ -193,6 +187,11 @@ nnoremap <silent> ga    <cmd>lua vim.lsp.buf.code_action()<CR>
 lua <<EOF
 local cmp = require'cmp'
 cmp.setup({
+  mapping = {
+    ['<C-p>'] = cmp.mapping.select_prev_item(),
+    ['<C-n>'] = cmp.mapping.select_next_item(),
+    ['<C-e>'] = cmp.mapping.close(),
+  },
   sources = {
     { name = 'path' },
     { name = 'buffer' },
