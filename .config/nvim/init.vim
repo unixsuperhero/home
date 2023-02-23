@@ -207,6 +207,11 @@ hi Comment cterm=bold gui=bold guifg=#a9b1d6
 nnoremap <silent> g[ <cmd>lua vim.diagnostic.goto_prev()<CR>
 nnoremap <silent> g] <cmd>lua vim.diagnostic.goto_next()<CR>
 
+augroup ruby
+  au!
+  au FileType ruby setlocal makeprg=ruby\ -c\ \%
+augroup END
+
 augroup rust
   au!
   au FileType rust setlocal makeprg=cargo\ build
