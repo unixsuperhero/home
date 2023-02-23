@@ -64,3 +64,4 @@ sftp-dest/
 work/
 Brewfile.lock.json
 .config/exercism/
+.sem.yaml
