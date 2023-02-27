@@ -14,6 +14,7 @@ email = jearsh@gmail.com
   dd = diff development --name-only --diff-filter=d
   lod = log --oneline --decorate
   lodd = log --oneline --decorate -10
+  lol = log --oneline --pretty=format:'%C(auto)%h%d%Creset %C(cyan)(%cr)%Creset %C(green)%cn <%ce>%Creset %s'
   lsm = diff master --name-only --diff-filter=d
   pod = pull origin development
   pom = pull origin master
