@@ -127,3 +127,4 @@ alias wo="timer 30m && terminal-notifier -message 'Pomodoro'\
 alias br="timer 10m && terminal-notifier -message 'Pomodoro'\
         -title 'Break is over! Get back to work 😬'\
         -sound Crystal"
+source <(/opt/homebrew/bin/starship init zsh --print-full-init)
