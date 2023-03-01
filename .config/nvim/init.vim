@@ -112,9 +112,9 @@ nmap ,T :T bundle exec rspec <c-r>=expand('%')<cr>:<c-r>=line('.')<cr><cr>
 nmap <expr> ,s execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), '<\cr>a'], ''), '\\', '', 'g'))
 nmap <expr> ,S execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), ':', line('.'), '<\cr>a'], ''), '\\', '', 'g'))
 
-nnoremap ,r <cmd>T cat -n % \| rg '\b(module\|class\|def)\b'<cr>
-nnoremap ,R <cmd>T cat -n % \| rg '\b(context\|it\|describe)\b'<cr>
-nnoremap ,L <cmd>T cat -n % \| rg '\b(context\|it\|describe\|let)\b'<cr>
+nnoremap ,r <cmd>VT cat -n % \| rg '\b(module\|class\|def)\b'<cr>
+nnoremap ,R <cmd>VT cat -n % \| rg '\b(context\|it\|describe)\b'<cr>
+nnoremap ,L <cmd>VT cat -n % \| rg '\b(context\|it\|describe\|let)\b'<cr>
 
 nnoremap ,, <c-^>
 
@@ -131,6 +131,7 @@ cabbrev V vert
 cabbrev vb vert sb
 
 command! -nargs=* T split | wincmd J | terminal <args>; zsh -i
+command! -nargs=* VT vsplit | wincmd L | terminal <args>; zsh -i
 
 lua <<EOF
 
@@ -206,6 +207,11 @@ hi Comment cterm=bold gui=bold guifg=#a9b1d6
 
 nnoremap <silent> g[ <cmd>lua vim.diagnostic.goto_prev()<CR>
 nnoremap <silent> g] <cmd>lua vim.diagnostic.goto_next()<CR>
+
+augroup haml
+  au!
+  au FileType haml setlocal makeprg=haml\ compile\ -c\ \%
+augroup END
 
 augroup ruby
   au!

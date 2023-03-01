@@ -36,6 +36,7 @@
 .yarnrc
 .z
 .z.*
+.z-*
 .zcompdump
 .zprofile.macports-saved_2022-05-31_at_01:40:23
 .zsh_history
