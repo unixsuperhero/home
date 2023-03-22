@@ -68,7 +68,7 @@ alias gbs="gb | sed 's/.*[[:space:]]//' | sk"
 alias sc="bin/rails c"
 alias ss="bin/rails s -p 3000"
 alias ssp="bin/rails s -p"
-alias wkr='(unset DADE_NEXT; QUEUE=* bundle exec rake resque:work)'
+alias wkr='QUEUE=* bundle exec rake resque:work'
 
 alias ezs="vim ~/.zshrc"
 alias .zs="source ~/.zshrc"
@@ -130,3 +130,16 @@ alias br="timer 10m && terminal-notifier -message 'Pomodoro'\
 
 export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
 source <(/opt/homebrew/bin/starship init zsh --print-full-init)
+
+
+
+image="/Users/unixsuperhero/Downloads/mina-iterm.jpg"
+width=1600
+height=600
+printf -v iterm_cmd '\e]1337;File=width=%spx;height=%spx;inline=1:%s' "$width" "$height" "$(base64 < "$image")"
+
+# Tmux requires an additional escape sequence for this to work.
+# [[ -n "$TMUX" ]] && printf -v iterm_cmd '\ePtmux;\e%b\e'\\ "$iterm_cmd"
+
+printf '%b\a\n' "$iterm_cmd"
+alias berof="ber --only-failures"
