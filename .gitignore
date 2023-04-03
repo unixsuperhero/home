@@ -67,3 +67,4 @@ Brewfile.lock.json
 .config/exercism/
 .sem.yaml
 tmp/
+notes/
