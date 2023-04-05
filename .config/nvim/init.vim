@@ -54,12 +54,18 @@ Plug 'hrsh7th/cmp-buffer'
 " Snippet engine
 " Plug 'hrsh7th/vim-vsnip'
 
+" COLORSCHEMES
+" Plug 'ayu-theme/ayu-vim' " or other package manager
+" Plug 'whatyouhide/vim-gotham'
+" Plug 'NLKNguyen/papercolor-theme'
+" Plug 'kyoz/purify', { 'rtp': 'vim' }
+" Plug 'junegunn/seoul256.vim'
+Plug 'jaredgorski/spacecamp'
+
 " Some color scheme other then default
 endif
 
 call plug#end()
-
-colorscheme tokyonight
 
 set clipboard+=unnamedplus
 
@@ -82,6 +88,21 @@ if exists("&termguicolors") && exists("&winblend")
   set wildoptions=pum
   set pumblend=5
   set background=dark
+
+  " let ayucolor="light"  " for light version of theme
+  " let ayucolor="mirage" " for mirage version of theme
+  " let ayucolor="dark"   " for dark version of theme
+  " colorscheme ayu
+
+  " colorscheme tokyonight
+  " colorscheme gotham256
+  " colorscheme papercolor
+  " colorscheme purify
+
+  " let g:seoul256_background = 232
+  " colorscheme seoul256
+
+  colorscheme spacecamp
 endif
 
 set winheight=10 winminheight=5
@@ -202,8 +223,8 @@ EOF
 
 set updatetime=300
 
-hi LineNr cterm=bold gui=bold guifg=#a9b1d6
-hi Comment cterm=bold gui=bold guifg=#a9b1d6
+hi LineNr cterm=none gui=none guifg=#a9b1d6
+hi Comment cterm=none gui=none guifg=#a9b1d6
 
 nnoremap <silent> g[ <cmd>lua vim.diagnostic.goto_prev()<CR>
 nnoremap <silent> g] <cmd>lua vim.diagnostic.goto_next()<CR>
