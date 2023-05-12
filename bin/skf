@@ -1,0 +1,18 @@
+#!/bin/bash
+
+function sk_search() {
+  terms=""
+
+  for a in $@; do
+    if [[ "$a" =~ ^[:=] ]]; then
+      terms="$terms '${a/?/}"
+    else
+      terms="$terms $a"
+    fi
+  done
+
+  sk --cmd 'git ls-files' -f "$terms"
+}
+
+sk_search "$@"
+

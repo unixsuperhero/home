@@ -1,0 +1,3 @@
+#!/bin/zsh
+
+sk --ansi -i -c 'rg --color=always --line-number "{}"' -m

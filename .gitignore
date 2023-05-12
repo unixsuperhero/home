@@ -57,7 +57,6 @@ bin/blanklines
 bin/h
 bin/reset_dbs
 bin/rm_pg_pid
-bin/skf
 hiiro/
 proj/
 ruby/
@@ -68,3 +67,8 @@ Brewfile.lock.json
 .sem.yaml
 tmp/
 notes/
+.solargraph
+.gnupg
+.doppler
+tmux-*.log
+productivity/
