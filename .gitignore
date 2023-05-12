@@ -72,3 +72,9 @@ notes/
 .doppler
 tmux-*.log
 productivity/
+.guard_history
+.node-gyp/
+.zcompcache/
+Calibre Library/
+getting-started/
+notes
