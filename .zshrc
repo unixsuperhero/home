@@ -3,7 +3,6 @@ setopt PROMPT_VARS
 
 export WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
 
-. /opt/homebrew/opt/asdf/libexec/asdf.sh
 . $(brew --prefix)/etc/profile.d/z.sh
 
 export HOMEBREW_NO_ENV_HINTS=1
@@ -42,6 +41,7 @@ alias gph="git push origin HEAD"
 alias gpod="git pull origin development"
 alias gpr="git pull --rebase"
 alias gst="git status -s"
+alias spring="bin/spring"
 alias st="git status -s"
 
 alias greset="git checkout .; git clean -fd"
@@ -129,17 +129,17 @@ alias br="timer 10m && terminal-notifier -message 'Pomodoro'\
         -sound Crystal"
 
 export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
-source <(/opt/homebrew/bin/starship init zsh --print-full-init)
+source <(starship init zsh --print-full-init)
 
 
 
-image="/Users/unixsuperhero/Downloads/mina-iterm.jpg"
-width=1600
-height=600
-printf -v iterm_cmd '\e]1337;File=width=%spx;height=%spx;inline=1:%s' "$width" "$height" "$(base64 < "$image")"
-
-# Tmux requires an additional escape sequence for this to work.
-# [[ -n "$TMUX" ]] && printf -v iterm_cmd '\ePtmux;\e%b\e'\\ "$iterm_cmd"
-
-printf '%b\a\n' "$iterm_cmd"
-alias berof="ber --only-failures"
+# image="/Users/unixsuperhero/Downloads/mina-iterm.jpg"
+# width=1600
+# height=600
+# printf -v iterm_cmd '\e]1337;File=width=%spx;height=%spx;inline=1:%s' "$width" "$height" "$(base64 < "$image")"
+#
+# # Tmux requires an additional escape sequence for this to work.
+# # [[ -n "$TMUX" ]] && printf -v iterm_cmd '\ePtmux;\e%b\e'\\ "$iterm_cmd"
+#
+# printf '%b\a\n' "$iterm_cmd"
+# alias berof="ber --only-failures"
