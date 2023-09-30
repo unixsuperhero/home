@@ -133,10 +133,13 @@ nmap ,T :T bundle exec rspec <c-r>=expand('%')<cr>:<c-r>=line('.')<cr><cr>
 nmap <expr> ,s execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), '<\cr>a'], ''), '\\', '', 'g'))
 nmap <expr> ,S execute(substitute(join([':nmap <\space>t :T bundle exec rspec ', expand('%'), ':', line('.'), '<\cr>a'], ''), '\\', '', 'g'))
 
-nnoremap ,r <cmd>VT cat -n % \| rg '\b(module\|class\|def)\b'<cr>
-nnoremap ,R <cmd>VT cat -n % \| rg '\b(context\|it\|describe)\b'<cr>
-nnoremap ,L <cmd>VT cat -n % \| rg '\b(context\|it\|describe\|let)\b'<cr>
+" nnoremap ,r <cmd>vnew +!rg '^\s*\d+\s*\b(module|class|def)\b' % >tmp/iface<cr>
+" nnoremap ,R <cmd>vnew +!rg '^\s*\d+\s*\b(context|it|describe)\b' % >tmp/iface<cr>
+" nnoremap ,L <cmd>vnew +!rg '^\s*\d+\s*\b(context|it|describe|let)\b' % >tmp/iface<cr>
 
+nnoremap ,r :vnew \| 0r !cat -n <c-r>=expand('%')<cr> \| rg '^\s*\d+\s*\b(module\|class\|def)\b'<cr>
+nnoremap ,R :vnew \| 0r !cat -n <c-r>=expand('%')<cr> \| rg '^\s*\d+\s*\b(context\|it\|describe)\b'<cr>
+nnoremap ,L :vnew \| 0r !cat -n <c-r>=expand('%')<cr> \| rg '^\s*\d+\s*\b(context\|it\|describe\|let)\b'<cr>
 nnoremap ,, <c-^>
 
 tnoremap <esc> <c-\><c-n>
