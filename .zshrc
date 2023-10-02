@@ -10,6 +10,7 @@ export PATH="$HOME/bin:$HOME/.ghcup/bin:$PATH"
 
 export EDITOR=$HOME/bin/safe_nvim
 export DADE_NEXT=1
+export DISABLE_SPRING=1
 bindkey -e # after setting editor, reset terminal to emacs mode
 alias vim="$HOME/bin/safe_nvim"
 
@@ -43,8 +44,9 @@ alias gpr="git pull --rebase"
 alias gst="git status -s"
 alias spring="bin/spring"
 alias st="git status -s"
-
 alias greset="git checkout .; git clean -fd"
+alias spring="bin/spring"
+alias webpack="bin/webpack"
 
 # alias skf="sk --cmd 'git ls-files' -f"
 
@@ -106,19 +108,12 @@ function pad() {
 
 export PS1=$'\n'"%~ \$(git_prompt_info)"$'\n'"%#> "
 
-# Homebrew
-# export PATH=/opt/homebrew/bin:$PATH
-# export PATH="/opt/homebrew/sbin:$PATH"
-# rbenv
-# export RBENV_ROOT=/opt/homebrew/opt/rbenv
-# export PATH=$RBENV_ROOT/bin:$PATH
-eval "$(rbenv init -)"
-# openssl
-export PATH="/opt/homebrew/opt/openssl@1.1/bin:$PATH"
-export LDFLAGS="-L/opt/homebrew/opt/openssl@1.1/lib"
-export CPPFLAGS="-I/opt/homebrew/opt/openssl@1.1/include"
-export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@1.1/lib/pkgconfig"
-export RUBY_CONFIGURE_OPTS="--with-openssl-dir=/opt/homebrew/opt/openssl@1.1"
+# # openssl
+# export PATH="/opt/homebrew/opt/openssl@1.1/bin:$PATH"
+# export LDFLAGS="-L/opt/homebrew/opt/openssl@1.1/lib"
+# export CPPFLAGS="-I/opt/homebrew/opt/openssl@1.1/include"
+# export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@1.1/lib/pkgconfig"
+# export RUBY_CONFIGURE_OPTS="--with-openssl-dir=/opt/homebrew/opt/openssl@1.1"
 
 alias wo="timer 30m && terminal-notifier -message 'Pomodoro'\
         -title 'Work Timer is up! Take a Break 😊'\
@@ -143,3 +138,8 @@ source <(starship init zsh --print-full-init)
 #
 # printf '%b\a\n' "$iterm_cmd"
 # alias berof="ber --only-failures"
+
+. "$HOME/.asdf/asdf.sh"
+# export PATH="/opt/homebrew/opt/openssl@1.1/bin:$PATH"
+eval "$(rbenv init -)"
+export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
