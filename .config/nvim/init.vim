@@ -154,6 +154,8 @@ iabbrev sao save_and_open_page
 cabbrev V vert
 cabbrev vb vert sb
 
+cabbrev ndiff /[<>=]\{7}
+
 command! -nargs=* T split | wincmd J | terminal <args>; zsh -i
 command! -nargs=* VT vsplit | wincmd L | terminal <args>; zsh -i
 
