@@ -85,7 +85,7 @@ if exists("&termguicolors") && exists("&winblend")
   syntax enable
   set termguicolors
   set winblend=0
-  set wildoptions=pum
+  set wildoptions=fuzzy
   set pumblend=5
   set background=dark
 

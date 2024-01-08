@@ -58,6 +58,13 @@ alias bers="bundle exec rspec \$(gddev | specs)"
 alias berof="bundle exec rspec --only-failures"
 alias dirty="bundle exec rspec \$(gss | specs)"
 
+function file_exists {
+  while read fn
+  do
+    test -f $fn && echo $fn
+  done
+}
+
 function gddev {
   if [[ $PWD == *postprocessors* ]]; then
     git diff master --name-only --diff-filter=d | sed 's/.*[[:space:]]//'
