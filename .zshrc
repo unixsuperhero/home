@@ -138,7 +138,7 @@ source <(starship init zsh --print-full-init)
 # printf '%b\a\n' "$iterm_cmd"
 # alias berof="ber --only-failures"
 
-. "$HOME/.asdf/asdf.sh"
+# . "$HOME/.asdf/asdf.sh"
 # export PATH="/opt/homebrew/opt/openssl@1.1/bin:$PATH"
 eval "$(rbenv init -)"
 export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
