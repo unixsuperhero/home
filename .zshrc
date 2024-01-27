@@ -1,5 +1,6 @@
 setopt EXTENDED_GLOB
 setopt PROMPT_VARS
+disable -p '#'
 
 export WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
 
