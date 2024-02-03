@@ -76,6 +76,13 @@ require('lazy').setup({
   -- Detect tabstop and shiftwidth automatically
   'tpope/vim-sleuth',
   'tpope/vim-eunuch',
+  'tpope/vim-sensible',
+  'tpope/vim-rsi',
+  'tpope/vim-endwise',
+  'tpope/vim-surround',
+  'vim-ruby/vim-ruby',
+  'godlygeek/tabular',
+  'jremmen/vim-ripgrep',
 
   -- NOTE: This is where your plugins related to LSP can be installed.
   --  The configuration is done below. Search for lspconfig to find it below.
@@ -115,6 +122,7 @@ require('lazy').setup({
 
   -- Useful plugin to show you pending keybinds.
   { 'folke/which-key.nvim', opts = {} },
+
   {
     -- Adds git related signs to the gutter, as well as utilities for managing changes
     'lewis6991/gitsigns.nvim',
@@ -191,24 +199,23 @@ require('lazy').setup({
   },
 
   {
-    -- Theme inspired by Atom
-    'navarasu/onedark.nvim',
-    priority = 1000,
-    config = function()
-      vim.cmd.colorscheme 'onedark'
-    end,
-  },
-
-  {
     -- Set lualine as statusline
     'nvim-lualine/lualine.nvim',
     -- See `:help lualine.txt`
     opts = {
       options = {
         icons_enabled = false,
-        theme = 'onedark',
+        theme = 'solarized_dark',
         component_separators = '|',
         section_separators = '',
+      },
+      sections = {
+        lualine_c = {
+          {
+            'filename',
+            path = 1,
+          },
+        },
       },
     },
   },
@@ -267,7 +274,7 @@ require('lazy').setup({
   --    Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --
   --    For additional information see: https://github.com/folke/lazy.nvim#-structuring-your-plugins
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
 }, {})
 
 -- [[ Setting options ]]
@@ -282,6 +289,8 @@ vim.wo.number = true
 
 -- Enable mouse mode
 vim.o.mouse = ''
+
+vim.o.wrap = false
 
 -- Sync clipboard between OS and Neovim.
 --  Remove this option if you want your OS clipboard to remain independent.
@@ -328,23 +337,32 @@ vim.keymap.set('n', 'j', "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = tr
 -- Diagnostic keymaps
 vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous diagnostic message' })
 vim.keymap.set('n', ']d', vim.diagnostic.goto_next, { desc = 'Go to next diagnostic message' })
-vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Open floating diagnostic message' })
-vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostics list' })
+vim.keymap.set('n', ';e', vim.diagnostic.open_float, { desc = 'Open floating diagnostic message' })
+vim.keymap.set('n', ';q', vim.diagnostic.setloclist, { desc = 'Open diagnostics list' })
 
 -- escape leaves terminal mode
 vim.keymap.set('t', '<esc>', '<c-\\><c-n>')
+
+-- my keymaps
 vim.keymap.set('n', '<leader>w', ':w<cr>')
+vim.keymap.set('n', '<leader>e', ':e <c-r>=expand("%:h")<cr>/')
+vim.keymap.set('n', '<leader>s', ':sp <c-r>=expand("%:h")<cr>/')
+vim.keymap.set('n', '<leader>v', ':vs <c-r>=expand("%:h")<cr>/')
+vim.keymap.set('n', '<leader>q', ':q<cr>')
+vim.keymap.set('n', 'cob', ':set buftype=nofile<cr>')
+vim.keymap.set('n', 'coB', ':set buftype=<cr>')
+vim.keymap.set('n', 'cow', ':set invwrap<cr>')
 
 -- [[ Highlight on yank ]]
 -- See `:help vim.highlight.on_yank()`
-local highlight_group = vim.api.nvim_create_augroup('YankHighlight', { clear = true })
-vim.api.nvim_create_autocmd('TextYankPost', {
-  callback = function()
-    vim.highlight.on_yank()
-  end,
-  group = highlight_group,
-  pattern = '*',
-})
+-- local highlight_group = vim.api.nvim_create_augroup('YankHighlight', { clear = true })
+-- vim.api.nvim_create_autocmd('TextYankPost', {
+--   callback = function()
+--     vim.highlight.on_yank()
+--   end,
+--   group = highlight_group,
+--   pattern = '*',
+-- })
 
 -- [[ Configure Telescope ]]
 -- See `:help telescope` and `:help telescope.setup()`
@@ -619,6 +637,40 @@ mason_lspconfig.setup_handlers {
   end,
 }
 
+-- setup harpoon
+local harpoon = require("harpoon")
+
+harpoon:setup({
+  cmd = {
+    add = function ()
+      local idx = vim.fn.line(".")
+
+      -- read the current line
+      local cmd = vim.api.nvim_buf_get_lines(0, idx - 1, idx, false)[1]
+      if cmd == nil then
+        return nil
+      end
+
+      return {
+          context = {},
+          value = cmd,
+      }
+    end
+  }
+})
+
+vim.keymap.set("n", "<C-h>h", function() harpoon:list():append() end)
+vim.keymap.set("n", "<C-h><C-l>", function() harpoon.ui:toggle_quick_menu(harpoon:list()) end)
+
+vim.keymap.set("n", "<C-h>1", function() harpoon:list():select(1) end)
+vim.keymap.set("n", "<C-h>2", function() harpoon:list():select(2) end)
+vim.keymap.set("n", "<C-h>3", function() harpoon:list():select(3) end)
+vim.keymap.set("n", "<C-h>4", function() harpoon:list():select(4) end)
+
+-- Toggle previous & next buffers stored within Harpoon list
+vim.keymap.set("n", "<C-h><C-n>", function() harpoon:list():prev() end)
+vim.keymap.set("n", "<C-h><C-p>", function() harpoon:list():next() end)
+
 -- [[ Configure nvim-cmp ]]
 -- See `:help cmp`
 local cmp = require 'cmp'
@@ -641,7 +693,7 @@ cmp.setup {
     ['<C-b>'] = cmp.mapping.scroll_docs(-4),
     ['<C-f>'] = cmp.mapping.scroll_docs(4),
     ['<C-Space>'] = cmp.mapping.complete {},
-    ['<CR>'] = cmp.mapping.confirm {
+    ['<C-e>'] = cmp.mapping.confirm {
       behavior = cmp.ConfirmBehavior.Replace,
       select = true,
     },
@@ -665,11 +717,11 @@ cmp.setup {
     end, { 'i', 's' }),
   },
   sources = {
-    { name = 'nvim_lsp' },
     { name = 'luasnip' },
+    { name = 'nvim_lsp' },
     { name = 'path' },
   },
 }
 
--- The line beneath this is called `modeline`. See `:help modeline`
+vim.cmd[[colorscheme solarized-osaka]]
 -- vim: ts=2 sts=2 sw=2 et

@@ -10,6 +10,13 @@ brew 'tmux'
 brew 'bat'
 brew 'starship'
 brew 'rustup-init'
+
+# docker
+# brew 'docker'
+# brew 'docker-compose'
+# brew 'docker-credential-helper'
+# brew 'buildkit'
+
 cask 'vlc'
 cask 'notion'
 cask 'iterm2'
