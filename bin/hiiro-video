@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+require '/Users/unixsuperhero/bin/hiiro-base.rb'
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:resize) { |ofile, scale, nfile|
+  raise 'arg error' if [ofile, scale, nfile].compact.count != 3
+
+  puts msg: :inside_video, called: :handler, aka: :subcmd
+
+  scale_arg = [:scale, scale].join(?=)
+  system('ffmpeg', '-i', ofile, '-vf', scale_arg, nfile)
+}
+
+if o.runnable?
+  o.run
+else
+  puts :no_runnable_found
+end
+

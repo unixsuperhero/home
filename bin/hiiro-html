@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+require '/Users/unixsuperhero/bin/hiiro-base.rb'
+
+o = Hiiro.init(*ARGV)
+o.add_subcmd(:videos) { |outfile, *args|
+  puts :in_html_videos
+
+  if outfile&.match?(/^-/)
+    args = [outfile, *args]
+    outfile = nil
+  end
+
+  outfile = 'index.html' if outfile.nil?
+
+  if File.exist?(outfile) && args.none?{|a| a.match?(/-f/) }
+    puts 'File Exists: use -f flag to force'
+  else
+    tags = Dir.glob('*').map { |vid|
+      file_cmd = format('file --mime-type "%s"', vid)
+      result = %x[ #{file_cmd} ]
+      next unless result.match?(/video\//)
+
+      format('<p>%s</p><video height="480" controls><source src="%s"></video>', vid, vid)
+    }.compact
+
+    template = <<~TEMPLATE
+    <html>
+      <head>
+        <style>
+          a, p, video {
+            display: block;
+            margin-top: 20px;
+          }
+        </style>
+      </head>
+      <body>
+:r!ls *.mp4 | sed 's@.*@<video height="480" controls><source src="&" type="video/mp4"></video>@'
+<hr/>
+      %s
+      </body>
+    </html>
+    TEMPLATE
+
+    contents = format(template, tags.join("\n"))
+    bytes = IO.write(outfile, contents)
+
+    printf("video count: %d\n", tags.count)
+    printf("bytes_written: %d\n", bytes)
+  end
+}
+
+o.run
+

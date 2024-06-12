@@ -353,6 +353,37 @@ vim.keymap.set('n', 'cob', ':set buftype=nofile<cr>')
 vim.keymap.set('n', 'coB', ':set buftype=<cr>')
 vim.keymap.set('n', 'cow', ':set invwrap<cr>')
 
+function ShowFileStructure()
+  local curpath = vim.fn.expand('%')
+  print(curpath)
+  vim.api.nvim_command('vnew')
+  vim.api.nvim_command('set buftype=nofile')
+  vim.api.nvim_command('0r !cat -n ' .. curpath)
+  vim.api.nvim_command('%!rg "^\\s*\\d+\\s*\\b(module|class|def)\\b"')
+end
+
+function ShowTestFileStructure()
+  local curpath = vim.fn.expand('%')
+  print(curpath)
+  vim.api.nvim_command('vnew')
+  vim.api.nvim_command('set buftype=nofile')
+  vim.api.nvim_command('0r !cat -n ' .. curpath)
+  vim.api.nvim_command('%!rg "^\\s*\\d+\\s*\\b(context|it|describe)\\b"')
+end
+
+function ShowTestFileStructureWithLet()
+  local curpath = vim.fn.expand('%')
+  print(curpath)
+  vim.api.nvim_command('vnew')
+  vim.api.nvim_command('set buftype=nofile')
+  vim.api.nvim_command('0r !cat -n ' .. curpath)
+  vim.api.nvim_command('%!rg "^\\s*\\d+\\s*\\b(context|it|describe|let)\\b"')
+end
+
+vim.keymap.set('n', ',r', ShowFileStructure)
+vim.keymap.set('n', ',R', ShowTestFileStructure)
+vim.keymap.set('n', ',L', ShowTestFileStructureWithLet)
+
 -- [[ Highlight on yank ]]
 -- See `:help vim.highlight.on_yank()`
 -- local highlight_group = vim.api.nvim_create_augroup('YankHighlight', { clear = true })
@@ -722,6 +753,13 @@ cmp.setup {
     { name = 'path' },
   },
 }
+
+vim.api.nvim_create_augroup('golang', { clear = true })
+vim.api.nvim_create_autocmd('Filetype', {
+  group = 'golang',
+  pattern = { 'go' },
+  command = 'setlocal shiftwidth=4 tabstop=4'
+})
 
 vim.cmd[[colorscheme solarized-osaka]]
 -- vim: ts=2 sts=2 sw=2 et

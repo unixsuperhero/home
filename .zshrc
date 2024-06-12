@@ -8,7 +8,7 @@ export WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
 
 export HOMEBREW_NO_ENV_HINTS=1
 export HOMEBREW_NO_AUTO_UPDATE=1
-export PATH="$HOME/bin:$HOME/.ghcup/bin:$PATH"
+export PATH="$HOME/bin:$HOME/go/bin:$HOME/.ghcup/bin:$PATH"
 
 export EDITOR=$HOME/bin/safe_nvim
 export DADE_NEXT=1

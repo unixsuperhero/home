@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if test $# -gt 0
+then
+	url="$1"
+else
+	url="$(pbpaste)"
+	echo "$url"
+	echo
+	echo "press enter to continue..."
+	read x
+fi
+
+yt-dlp --write-subs --sub-langs all "$url"
+
