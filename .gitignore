@@ -83,3 +83,5 @@ Calibre Library/
 home/
 .config/qBittorrent
 .colima/
+go/
+yt-audio/
