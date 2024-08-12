@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'pry'
+require 'open3'
 
 class Directory
   def self.temp_cd(dir, &block)
@@ -8,6 +9,32 @@ class Directory
     Dir.chdir(dir)
     block.call
     Dir.chdir(pwd)
+  end
+
+  def self.all_subfiles(path)
+    Dir.glob File.join(path, '**/*')
+  end
+
+  def self.subdirs(path)
+    Dir.glob File.join(path, '*', '')
+  end
+
+  def self.all_subdirs(path)
+    dirs = Dir.glob File.join(path, '**', '*/')
+
+    regex = /#{path}\/*/
+    dirs.map do |subdir|
+      subdir.sub(regex, '')
+    end
+  end
+
+  def self.dir_tree(path, depth=0)
+    subdirs(path).each do |subdir|
+      lpad = '  ' * depth
+      puts format('%s%s/', lpad, File.basename(subdir))
+
+      dir_tree(subdir, depth + 1)
+    end
   end
 end
 
