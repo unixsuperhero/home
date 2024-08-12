@@ -82,5 +82,8 @@ Calibre Library/
 home/
 .config/qBittorrent
 .colima/
+.sqlite_history
 go/
 yt-audio/
+backup.notes/
+notes.old/

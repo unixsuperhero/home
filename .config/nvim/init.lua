@@ -291,6 +291,10 @@ vim.wo.number = true
 vim.o.mouse = ''
 
 vim.o.wrap = false
+vim.o.sw = 2
+vim.o.ts = 2
+vim.o.sts = 2
+vim.o.expandtab = true
 
 -- Sync clipboard between OS and Neovim.
 --  Remove this option if you want your OS clipboard to remain independent.
@@ -762,4 +766,13 @@ vim.api.nvim_create_autocmd('Filetype', {
 })
 
 vim.cmd[[colorscheme solarized-osaka]]
+
+local function dupe_slide()
+  vim.cmd[[?---?,/\%$\|\n\(---\)\@=/y]]
+  vim.cmd[[/\n\(---\)\@=\|\%$/]]
+  vim.cmd[[norm p]]
+end
+
+vim.keymap.set('n', ',sd', dupe_slide)
+
 -- vim: ts=2 sts=2 sw=2 et

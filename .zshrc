@@ -84,7 +84,6 @@ alias ezs="vim ~/.zshrc"
 alias .zs="source ~/.zshrc"
 
 alias rg="rg -S"
-alias cat="bat"
 
 function gss() {
   if test $# -gt 0; then
