@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require '/Users/unixsuperhero/bin/hiiro-base.rb'
+require '/Users/unixsuperhero/bin/h-base.rb'
 
 o = Hiiro.init(*ARGV)
 

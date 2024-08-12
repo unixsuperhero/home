@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+
+require '/Users/unixsuperhero/bin/h-base.rb'
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:new) { |*args|
+  root_dir = File.join(Dir.home, 'notes')
+
+  unless Dir.exist?(root_dir)
+    Dir.mkdir(root_dir)
+  end
+
+  Directory.temp_cd(root_dir) {
+    system('vim', '-O', *args)
+  }
+}
+
+if o.runnable?
+  o.run
+else
+  puts :no_runnable_found
+end
+

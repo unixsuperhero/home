@@ -2,6 +2,15 @@
 
 require 'pry'
 
+class Directory
+  def self.temp_cd(dir, &block)
+    pwd = Dir.pwd
+    Dir.chdir(dir)
+    block.call
+    Dir.chdir(pwd)
+  end
+end
+
 class Hiiro
   def self.init(*args)
     bin = File.basename($0)
@@ -48,6 +57,10 @@ class Hiiro
 
   def args
     @args ||= original_args[1..]
+  end
+
+  def add_default(&block)
+    handlers['DEFAULT'] = block
   end
 
   def add_subcmd(name, &block)

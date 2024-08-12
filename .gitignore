@@ -54,7 +54,6 @@ Pictures/
 Public/
 bin/alert
 bin/blanklines
-bin/h
 bin/reset_dbs
 bin/rm_pg_pid
 hiiro/
