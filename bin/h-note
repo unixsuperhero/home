@@ -12,7 +12,7 @@ o.add_subcmd(:new) { |*args|
   end
 
   Directory.temp_cd(root_dir) {
-    system('vim', '-O', *args)
+    system(ENV['EDITOR'] || 'vim', '-O', *args)
   }
 }
 
