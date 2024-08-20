@@ -9,7 +9,11 @@ o.add_subcmd(:vids) { |outfile, *args|
     next if File.directory?(vid)
 
     vid.inspect
-  }.compact.join(",\n")
+  }.compact
+
+  puts video_count: videos.count
+
+  videos = videos.join(",\n")
 
   template = <<~TEMPLATE
 <html>
@@ -17,6 +21,11 @@ o.add_subcmd(:vids) { |outfile, *args|
     <style>
       a, p, video {
         margin-top: 20px;
+      }
+      select, textarea {
+        margin-top: 20px;
+        width: 80%;
+        display: block;
       }
     </style>
     <script type="text/javascript">
@@ -48,6 +57,7 @@ o.add_subcmd(:vids) { |outfile, *args|
         var id = parseInt(idx);
         src.src = videos[id];
         player.load();
+        load_stats();
       }
 
       function save_video() {
@@ -101,6 +111,12 @@ o.add_subcmd(:vids) { |outfile, *args|
         }
       }
 
+      function clear_last() {
+        localStorage.removeItem('last_vid');
+
+        show_last();
+      }
+
       function mark_last() {
         var sel = document.getElementById('links');
         var idx = sel.value;
@@ -112,8 +128,49 @@ o.add_subcmd(:vids) { |outfile, *args|
       }
 
       function show_last() {
+        var links = document.getElementById('links');
         var div = document.getElementById('last_vid');
-        div.innerHTML = localStorage.getItem('last_vid') || 'no last vid';
+        var last_vid = localStorage.getItem('last_vid') || 'no last vid';
+        div.innerHTML = last_vid;
+        var found = false;
+        if(last_vid != 'no last vid') {
+          for(var x=0; x<videos.length; x++) {
+            if(videos[x] == last_vid) {
+              found = true;
+              links.selectedIndex = x;
+              load_video();
+              break;
+            }
+          }
+        }
+        if(found == false) {
+          links.selectedIndex = 0;
+          load_stats();
+        }
+      }
+
+      function prev_vid() {
+        var sel = document.getElementById('links');
+        if(sel.selectedIndex == 0) return;
+        sel.selectedIndex = sel.selectedIndex - 1;
+        load_video();
+      }
+
+      function next_vid() {
+        var sel = document.getElementById('links');
+        if(sel.selectedIndex >= sel.length - 1) return;
+        sel.selectedIndex = sel.selectedIndex + 1;
+        load_video();
+        mark_last();
+      }
+
+      function load_stats() {
+        var sel = document.getElementById('links');
+        var cur = document.getElementById('current_idx');
+        var total = document.getElementById('total_links');
+
+        cur.innerHTML = sel.selectedIndex + 1;
+        total.innerHTML = sel.length;
       }
     </script>
   </head>
@@ -122,25 +179,29 @@ o.add_subcmd(:vids) { |outfile, *args|
   <hr/>
 
   <div id="last_vid">not loaded</div>
+  <a href="#" onclick="mark_last()" />Mark Last</a> |
+  <a href="#" onclick="clear_last()" />Clear Last</a>
 
-  <select id="links" size="5">
+  <div id="links_stats">
+    <span id="current_idx">0</span> /
+    <span id="total_links">99999</span>
+  </div>
+  <select id="links" size="5" onchange="load_stats(); load_video();">
   </select>
+  <a href="#" onclick="load_video()" />Load</a> |
+  <a href="#" onclick="save_video()" />Save</a> |
+  <a href="#" onclick="prev_vid()">Prev Vid</a> |
+  <a href="#" onclick="next_vid()">Next Vid</a>
 
   <select id="favs_select" size="5">
   </select>
+  <a href="#" onclick="load_fav()" />Load Fav</a>
 
   <textarea id="export_favs" rows="5" cols="40">
   </textarea>
 
-  <br/>
-  <br/>
-  <a href="#" onclick="load_video()" />Load</a> |
-  <a href="#" onclick="save_video()" />Save</a> |
-  <a href="#" onclick="console.log(localStorage.getItem('favs') || '[]')" />View Saved</a> |
-  <a href="#" onclick="mark_last()" />Mark Last</a> |
-  <a href="#" onclick="load_fav()" />Load Fav</a> |
   <a href="#" onclick="localStorage.removeItem('favs'); display_favs();" />Clear Favs</a> |
-  <a href="#" onclick="export_favs()" />Export Fav</a>
+  <a href="#" onclick="export_favs()" />Export Favs</a>
 
   <div id="player_wrapper">
     <video id="player" height="480" controls>
@@ -152,8 +213,8 @@ o.add_subcmd(:vids) { |outfile, *args|
     create_links();
     display_favs();
     show_last();
+    load_stats();
   </script>
-
   </body>
 </html>
   TEMPLATE
