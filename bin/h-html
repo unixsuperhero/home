@@ -57,6 +57,8 @@ o.add_subcmd(:vids) { |outfile, *args|
         var id = parseInt(idx);
         src.src = videos[id];
         player.load();
+        player.currentTime = 5;
+        player.play();
         load_stats();
       }
 
