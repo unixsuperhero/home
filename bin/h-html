@@ -2,6 +2,167 @@
 require '/Users/unixsuperhero/bin/h-base.rb'
 
 o = Hiiro.init(*ARGV)
+o.add_subcmd(:vids) { |outfile, *args|
+  outfile = 'index.html' if outfile.nil?
+
+  videos = Dir.glob('*.mp4').map { |vid|
+    next if File.directory?(vid)
+
+    vid.inspect
+  }.compact.join(",\n")
+
+  template = <<~TEMPLATE
+<html>
+  <head>
+    <style>
+      a, p, video {
+        margin-top: 20px;
+      }
+    </style>
+    <script type="text/javascript">
+      var favs = localStorage.getItem('favs') || '[]';
+      console.log({ favs: favs });
+
+      var videos = [
+      #{videos}
+      ];
+
+      function create_links() {
+        var container = document.getElementById('links');
+        var player = document.getElementById('player');
+
+        for(var x=0; x < videos.length; x++) {
+          var link = document.createElement('option');
+          link.value = x;
+          link.innerText = videos[x];
+
+          container.appendChild(link);
+        }
+      }
+
+      function load_video() {
+        var player = document.getElementById('player');
+        var src = document.getElementById('player_src');
+        var links = document.getElementById('links');
+        var idx = links.value;
+        var id = parseInt(idx);
+        src.src = videos[id];
+        player.load();
+      }
+
+      function save_video() {
+        var fav_videos = localStorage.getItem('favs') || '[]';
+        var json = JSON.parse(fav_videos);
+        console.log({ favs: fav_videos, json: json });
+
+        var vid = document.getElementById('links').value;
+        vid = videos[parseInt(vid)];
+
+        if(vid !== undefined) {
+          json.push(vid);
+
+          localStorage.setItem('favs', JSON.stringify(json));
+          fav_videos = localStorage.getItem('favs') || '[]';
+          json = JSON.parse(fav_videos);
+          console.log({ favs: fav_videos, json: json });
+        }
+
+        display_favs();
+      }
+
+      function load_fav() {
+        var sel = document.getElementById('favs_select');
+
+        var player = document.getElementById('player');
+        var src = document.getElementById('player_src');
+        src.src = sel.value;
+        player.load();
+      }
+
+      function export_favs() {
+        var text = document.getElementById('export_favs');
+        var data = localStorage.getItem('favs') || '[]';
+        var list = JSON.parse(data);
+        text.innerHTML = list.join("\\n");
+      }
+
+      function display_favs() {
+        var sel = document.getElementById('favs_select');
+        sel.innerHTML = '';
+
+        var data = localStorage.getItem('favs') || '[]';
+        var favs = JSON.parse(data);
+
+        for(var x=0; x<favs.length; x++) {
+          var opt = document.createElement('option');
+          opt.value = favs[x];
+          opt.innerText = favs[x];
+          sel.appendChild(opt);
+        }
+      }
+
+      function mark_last() {
+        var sel = document.getElementById('links');
+        var idx = sel.value;
+        var id = parseInt(idx);
+
+        localStorage.setItem('last_vid', videos[id]);
+
+        show_last();
+      }
+
+      function show_last() {
+        var div = document.getElementById('last_vid');
+        div.innerHTML = localStorage.getItem('last_vid') || 'no last vid';
+      }
+    </script>
+  </head>
+  <body>
+  :r!ls *.mp4 | sed 's@.*@&lt;video height="480" controls&gt;&lt;source src="&" type="video/mp4"&gt;&lt;/video&gt;@'
+  <hr/>
+
+  <div id="last_vid">not loaded</div>
+
+  <select id="links" size="5">
+  </select>
+
+  <select id="favs_select" size="5">
+  </select>
+
+  <textarea id="export_favs" rows="5" cols="40">
+  </textarea>
+
+  <br/>
+  <br/>
+  <a href="#" onclick="load_video()" />Load</a> |
+  <a href="#" onclick="save_video()" />Save</a> |
+  <a href="#" onclick="console.log(localStorage.getItem('favs') || '[]')" />View Saved</a> |
+  <a href="#" onclick="mark_last()" />Mark Last</a> |
+  <a href="#" onclick="load_fav()" />Load Fav</a> |
+  <a href="#" onclick="localStorage.removeItem('favs'); display_favs();" />Clear Favs</a> |
+  <a href="#" onclick="export_favs()" />Export Fav</a>
+
+  <div id="player_wrapper">
+    <video id="player" height="480" controls>
+      <source id="player_src" src="">
+    </video>
+  </div>
+
+  <script type="text/javascript">
+    create_links();
+    display_favs();
+    show_last();
+  </script>
+
+  </body>
+</html>
+  TEMPLATE
+
+  size = IO.write(outfile, template)
+
+  puts size: size
+}
+
 o.add_subcmd(:videos) { |outfile, *args|
   puts :in_html_videos
 
@@ -15,7 +176,9 @@ o.add_subcmd(:videos) { |outfile, *args|
   if File.exist?(outfile) && args.none?{|a| a.match?(/-f/) }
     puts 'File Exists: use -f flag to force'
   else
-    tags = Dir.glob('*').map { |vid|
+    tags = Dir.glob('**/*').map { |vid|
+      next if File.directory?(vid)
+
       file_cmd = format('file --mime-type "%s"', vid)
       result = %x[ #{file_cmd} ]
       next unless result.match?(/video\//)
@@ -34,7 +197,7 @@ o.add_subcmd(:videos) { |outfile, *args|
         </style>
       </head>
       <body>
-:r!ls *.mp4 | sed 's@.*@<video height="480" controls><source src="&" type="video/mp4"></video>@'
+:r!ls *.mp4 | sed 's@.*@&lt;video height="480" controls&gt;&lt;source src="&" type="video/mp4"&gt;&lt;/video&gt;@'
 <hr/>
       %s
       </body>
