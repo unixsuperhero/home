@@ -27,6 +27,18 @@ o.add_subcmd(:vids) { |outfile, *args|
         width: 80%;
         display: block;
       }
+      .flex_links {
+        display: flex;
+        gap: 70px;
+        margin-bottom: 10px;
+      }
+      * {
+        font-size: 16pt;
+      }
+
+      a {
+        font-size: 26pt;
+      }
     </style>
     <script type="text/javascript">
       var favs = localStorage.getItem('favs') || '[]';
@@ -174,6 +186,23 @@ o.add_subcmd(:vids) { |outfile, *args|
         cur.innerHTML = sel.selectedIndex + 1;
         total.innerHTML = sel.length;
       }
+
+      function trash() {
+        var sel = document.getElementById('links');
+        var idx = sel.selectedIndex;
+
+        var container = document.getElementById('trash');
+        var link = document.createElement('option');
+        link.value = idx;
+        link.innerText = videos[idx];
+
+        container.appendChild(link);
+      }
+
+      function clear_trash() {
+        var container = document.getElementById('trash');
+        container.innerHTML = '';
+      }
     </script>
   </head>
   <body>
@@ -181,8 +210,10 @@ o.add_subcmd(:vids) { |outfile, *args|
   <hr/>
 
   <div id="last_vid">not loaded</div>
-  <a href="#" onclick="mark_last()" />Mark Last</a> |
-  <a href="#" onclick="clear_last()" />Clear Last</a>
+  <div class="flex_links">
+    <a href="#" onclick="mark_last()" />Mark Last</a>
+    <a href="#" onclick="clear_last()" />Clear Last</a>
+  </div>
 
   <div id="links_stats">
     <span id="current_idx">0</span> /
@@ -190,20 +221,31 @@ o.add_subcmd(:vids) { |outfile, *args|
   </div>
   <select id="links" size="5" onchange="load_stats(); load_video();">
   </select>
-  <a href="#" onclick="load_video()" />Load</a> |
-  <a href="#" onclick="save_video()" />Save</a> |
-  <a href="#" onclick="prev_vid()">Prev Vid</a> |
-  <a href="#" onclick="next_vid()">Next Vid</a>
+  <div class="flex_links">
+    <a href="#" onclick="load_video()" />Load</a>
+    <a href="#" onclick="save_video()" />Save</a>
+    <a href="#" onclick="prev_vid()">Prev Vid</a>
+    <a href="#" onclick="next_vid()">Next Vid</a>
+  </div>
 
   <select id="favs_select" size="5">
   </select>
   <a href="#" onclick="load_fav()" />Load Fav</a>
 
+  <select id="trash" size="5">
+  </select>
+  <div class="flex_links">
+    <a href="#" onclick="trash()" />Trash</a>
+    <a href="#" onclick="clear_trash()" />Clear</a>
+  </div>
+
   <textarea id="export_favs" rows="5" cols="40">
   </textarea>
 
-  <a href="#" onclick="localStorage.removeItem('favs'); display_favs();" />Clear Favs</a> |
-  <a href="#" onclick="export_favs()" />Export Favs</a>
+  <div class="flex_links">
+    <a href="#" onclick="localStorage.removeItem('favs'); display_favs();" />Clear Favs</a>
+    <a href="#" onclick="export_favs()" />Export Favs</a>
+  </div>
 
   <div id="player_wrapper">
     <video id="player" height="480" controls>
