@@ -2,6 +2,7 @@
 
 require 'pry'
 require 'open3'
+require 'base64'
 
 class Directory
   def self.temp_cd(dir, &block)

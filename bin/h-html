@@ -5,6 +5,8 @@ o = Hiiro.init(*ARGV)
 o.add_subcmd(:vids) { |outfile, *args|
   outfile = 'index.html' if outfile.nil?
 
+  hash = Base64.encode64(Dir.pwd).strip
+
   videos = Dir.glob('*.mp4').map { |vid|
     next if File.directory?(vid)
 
@@ -41,7 +43,7 @@ o.add_subcmd(:vids) { |outfile, *args|
       }
     </style>
     <script type="text/javascript">
-      var favs = localStorage.getItem('favs') || '[]';
+      var favs = localStorage.getItem('favs-#{hash}') || '[]';
       console.log({ favs: favs });
 
       var videos = [
@@ -75,7 +77,7 @@ o.add_subcmd(:vids) { |outfile, *args|
       }
 
       function save_video() {
-        var fav_videos = localStorage.getItem('favs') || '[]';
+        var fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
         var json = JSON.parse(fav_videos);
         console.log({ favs: fav_videos, json: json });
 
@@ -85,8 +87,8 @@ o.add_subcmd(:vids) { |outfile, *args|
         if(vid !== undefined) {
           json.push(vid);
 
-          localStorage.setItem('favs', JSON.stringify(json));
-          fav_videos = localStorage.getItem('favs') || '[]';
+          localStorage.setItem('favs-#{hash}', JSON.stringify(json));
+          fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
           json = JSON.parse(fav_videos);
           console.log({ favs: fav_videos, json: json });
         }
@@ -105,7 +107,7 @@ o.add_subcmd(:vids) { |outfile, *args|
 
       function export_favs() {
         var text = document.getElementById('export_favs');
-        var data = localStorage.getItem('favs') || '[]';
+        var data = localStorage.getItem('favs-#{hash}') || '[]';
         var list = JSON.parse(data);
         text.innerHTML = list.join("\\n");
       }
@@ -114,7 +116,7 @@ o.add_subcmd(:vids) { |outfile, *args|
         var sel = document.getElementById('favs_select');
         sel.innerHTML = '';
 
-        var data = localStorage.getItem('favs') || '[]';
+        var data = localStorage.getItem('favs-#{hash}') || '[]';
         var favs = JSON.parse(data);
 
         for(var x=0; x<favs.length; x++) {
@@ -126,7 +128,7 @@ o.add_subcmd(:vids) { |outfile, *args|
       }
 
       function clear_last() {
-        localStorage.removeItem('last_vid');
+        localStorage.removeItem('last_vid-#{hash}');
 
         show_last();
       }
@@ -136,7 +138,7 @@ o.add_subcmd(:vids) { |outfile, *args|
         var idx = sel.value;
         var id = parseInt(idx);
 
-        localStorage.setItem('last_vid', videos[id]);
+        localStorage.setItem('last_vid-#{hash}', videos[id]);
 
         show_last();
       }
@@ -144,7 +146,7 @@ o.add_subcmd(:vids) { |outfile, *args|
       function show_last() {
         var links = document.getElementById('links');
         var div = document.getElementById('last_vid');
-        var last_vid = localStorage.getItem('last_vid') || 'no last vid';
+        var last_vid = localStorage.getItem('last_vid-#{hash}') || 'no last vid';
         div.innerHTML = last_vid;
         var found = false;
         if(last_vid != 'no last vid') {
@@ -243,7 +245,7 @@ o.add_subcmd(:vids) { |outfile, *args|
   </textarea>
 
   <div class="flex_links">
-    <a href="#" onclick="localStorage.removeItem('favs'); display_favs();" />Clear Favs</a>
+    <a href="#" onclick="localStorage.removeItem('favs-#{hash}'); display_favs();" />Clear Favs</a>
     <a href="#" onclick="export_favs()" />Export Favs</a>
   </div>
 
