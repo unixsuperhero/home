@@ -2,7 +2,7 @@
 
 require 'pry'
 require 'open3'
-require 'base64'
+require 'digest/sha1'
 
 class Directory
   def self.temp_cd(dir, &block)

@@ -5,7 +5,7 @@ o = Hiiro.init(*ARGV)
 o.add_subcmd(:vids) { |outfile, *args|
   outfile = 'index.html' if outfile.nil?
 
-  hash = Base64.encode64(Dir.pwd).strip
+  hash = Digest::SHA1.hexdigest(Dir.pwd)
 
   videos = Dir.glob('*.mp4').map { |vid|
     next if File.directory?(vid)
