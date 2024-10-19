@@ -19,9 +19,15 @@ class Feed
   end
 
   def uri = @uri ||= URI(url)
-  def rss = @rss ||= Net::HTTP.get(uri)
   def xml = @xml ||= Nokogiri::XML(rss)
   def items = @items ||= xml.css('item').map(&Item.method(:new))
+
+  def rss
+    @rss ||= proc {
+      puts format('Fetching feed: %s', uri)
+      Net::HTTP.get(uri)
+    }.call
+  end
 
   class Item
     attr_reader :root
@@ -49,10 +55,11 @@ class Torrent
     @encoded_data = encoded_data
   end
 
-  def data = @data ||= data.bdecode
+  def data = @data ||= encoded_data.bdecode
   def info = @info ||= data['info']
   def files = @files ||= info['files']
-  def file_count = @file_count ||= files ? files.count : 1
+  def file_count = @file_count ||= files.count || 1
+  def file_names = @file_names ||= files&.map{|f| f['path'] } || [info['name']]
 end
 
 o = Hiiro.init(*ARGV)
@@ -66,28 +73,22 @@ o.add_subcmd(:fetch) { |*args|
 
   history = File.readlines(File.join(xdg_data, 'history'), chomp: true) rescue []
 
-  feeds.each do |feed|
-    puts format('Fetching feed: %s', feed)
-    uri = URI(feed)
-    rss = Net::HTTP.get(uri)
+  feeds.each do |feed_url|
+    feed = Feed.new(feed_url)
 
-    xml = Nokogiri::XML(rss)
-
-    torrents = xml.css('item')
-    data = torrents.map do |torrent|
-      title = torrent.css('title')&.text
-      link = torrent.css('link')&.text
-
-      if history.include?(title)
-        puts format('Skip: "%s"', title)
+    torrents = feed.items.inject([]) do |list, item|
+      if history.include?(item.title)
+        puts format('Skip: "%s"', item.title)
         next
       end
 
-      puts format('Fetching torrent: "%s" => "%s"', title, link)
-      torrent_uri = URI(link)
-      torrent_file = Net::HTTP.get(torrent_uri)
+      puts format('Fetching torrent: "%s" => "%s"', item.title, item.link)
 
-      torrent_data = torrent_file.bdecode
+      list << Torrent.fetch(item.link)
+
+      break list if list.count >= 10
+
+      list
     end
 
     binding.pry
