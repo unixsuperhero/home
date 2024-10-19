@@ -4,12 +4,8 @@ require 'net/http'
 require 'uri'
 require 'nokogiri'
 require 'bencode_ext'
+require 'fileutils'
 require 'pry'
-
-xdg_config = File.join(Dir.home, '.config', 'h-torrent')
-xdg_data = File.join(Dir.home, '.local', 'share', 'h-torrent').tap do |dir|
-  Dir.mkdir(dir) unless Dir.exist?(dir)
-end
 
 class Feed
   attr_reader :url
@@ -63,8 +59,50 @@ class Torrent
   def videos = @videos ||= file_names.select{|name| Filetype.video?(name) }
 end
 
-class History; end
-class Feeds; end
+class History
+  ROOT_PATH = File.join(Dir.home, '.local', 'share', 'h-torrent')
+
+  def root_path = ROOT_PATH.tap { |p| FileUtils.mkdir_p(p) }
+  def history_path = File.join(root_path, 'history')
+
+  def history!
+    @history = File.readlines(history_path, chomp: true)
+  rescue
+    @history = []
+  end
+
+  def history
+    @history ||= history!
+  end
+
+  def includes?(name)
+    history.include?(name)
+  end
+
+  def append(name)
+    history << name
+
+    IO.write(history_path, history.join("\n"))
+  end
+end
+
+class Config
+  ROOT_PATH = File.join(Dir.home, '.config', 'h-torrent')
+  FEED_PATH = File.join(ROOT_PATH, 'feeds')
+  IGNORE_PATH = File.join(ROOT_PATH, 'ignore')
+
+  def self.feeds
+    File.readlines(FEED_PATH, chomp: true)
+  rescue
+    []
+  end
+
+  def self.ignores
+    File.readlines(IGNORE_PATH, chomp: true)
+  rescue
+    []
+  end
+end
 
 class Filetype
   def self.video?(name)
@@ -74,20 +112,18 @@ end
 
 o = Hiiro.init(*ARGV)
 o.add_subcmd(:fetch) { |*args|
-  feed_config_path = File.join(xdg_config, 'feeds')
-
   feeds = args
-  if feeds.none? && File.exist?(feed_config_path)
-    feeds = File.readlines(feed_config_path, chomp: true)
+  if feeds.none?
+    feeds = Config.feeds
   end
 
-  history = File.readlines(File.join(xdg_data, 'history'), chomp: true) rescue []
+  history = History.new
 
   feeds.each do |feed_url|
     feed = Feed.new(feed_url)
 
     torrents = feed.items.inject([]) do |list, item|
-      if history.include?(item.title)
+      if history.includes?(item.title)
         puts format('Skip: "%s"', item.title)
         next
       end
@@ -96,6 +132,7 @@ o.add_subcmd(:fetch) { |*args|
 
       list << Torrent.fetch(item.link)
 
+      history.append(item.title)
       break list if list.count >= 10
 
       list
