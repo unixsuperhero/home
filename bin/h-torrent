@@ -59,7 +59,7 @@ class Torrent
   def info = @info ||= data['info']
   def files = @files ||= info['files']
   def file_count = @file_count ||= files.count || 1
-  def file_names = @file_names ||= files&.map{|f| f['path'] } || [info['name']]
+  def file_names = @file_names ||= files&.flat_map{|f| f['path'] } || [info['name']]
   def videos = @videos ||= file_names.select{|name| Filetype.video?(name) }
 end
 
@@ -68,7 +68,7 @@ class Feeds; end
 
 class Filetype
   def self.video?(name)
-    name.matches?(/.*[.](mkv|mpe?g|avi|mp4)$/i)
+    name.match?(/.*[.](mkv|mpe?g|avi|mp4)$/i)
   end
 end
 
