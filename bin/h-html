@@ -6,6 +6,7 @@ o.add_subcmd(:vids) { |outfile, *args|
   outfile = 'index.html' if outfile.nil?
 
   hash = Digest::SHA1.hexdigest(Dir.pwd)
+  puts hash: hash
 
   videos = Dir.glob('*.mp4').map { |vid|
     next if File.directory?(vid)
@@ -103,6 +104,8 @@ o.add_subcmd(:vids) { |outfile, *args|
         var src = document.getElementById('player_src');
         src.src = sel.value;
         player.load();
+        player.currentTime = 5;
+        player.play();
       }
 
       function export_favs() {
@@ -213,8 +216,8 @@ o.add_subcmd(:vids) { |outfile, *args|
 
   <div id="last_vid">not loaded</div>
   <div class="flex_links">
-    <a href="#" onclick="mark_last()" />Mark Last</a>
-    <a href="#" onclick="clear_last()" />Clear Last</a>
+    <a href="javascript:void(0);" onclick="mark_last()" />Mark Last</a>
+    <a href="javascript:void(0);" onclick="clear_last()" />Clear Last</a>
   </div>
 
   <div id="links_stats">
@@ -224,29 +227,29 @@ o.add_subcmd(:vids) { |outfile, *args|
   <select id="links" size="5" onchange="load_stats(); load_video();">
   </select>
   <div class="flex_links">
-    <a href="#" onclick="load_video()" />Load</a>
-    <a href="#" onclick="save_video()" />Save</a>
-    <a href="#" onclick="prev_vid()">Prev Vid</a>
-    <a href="#" onclick="next_vid()">Next Vid</a>
+    <a href="javascript:void(0);" onclick="load_video()" />Load</a>
+    <a href="javascript:void(0);" onclick="save_video()" />Save</a>
+    <a href="javascript:void(0);" onclick="prev_vid()">Prev Vid</a>
+    <a href="javascript:void(0);" onclick="next_vid()">Next Vid</a>
   </div>
 
   <select id="favs_select" size="5">
   </select>
-  <a href="#" onclick="load_fav()" />Load Fav</a>
+  <a href="javascript:void(0);" onclick="load_fav()" />Load Fav</a>
 
   <select id="trash" size="5">
   </select>
   <div class="flex_links">
-    <a href="#" onclick="trash()" />Trash</a>
-    <a href="#" onclick="clear_trash()" />Clear</a>
+    <a href="javascript:void(0);" onclick="trash()" />Trash</a>
+    <a href="javascript:void(0);" onclick="clear_trash()" />Clear</a>
   </div>
 
   <textarea id="export_favs" rows="5" cols="40">
   </textarea>
 
   <div class="flex_links">
-    <a href="#" onclick="localStorage.removeItem('favs-#{hash}'); display_favs();" />Clear Favs</a>
-    <a href="#" onclick="export_favs()" />Export Favs</a>
+    <a href="javascript:void(0);" onclick="localStorage.removeItem('favs-#{hash}'); display_favs();" />Clear Favs</a>
+    <a href="javascript:void(0);" onclick="export_favs()" />Export Favs</a>
   </div>
 
   <div id="player_wrapper">

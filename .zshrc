@@ -150,3 +150,7 @@ source <(starship init zsh --print-full-init)
 # export PATH="/opt/homebrew/opt/openssl@1.1/bin:$PATH"
 eval "$(rbenv init -)"
 export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
+
+test -n $SSH_CLIENT && test -z $VIM && tmux new -A -s remote
+
+

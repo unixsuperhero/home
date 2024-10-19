@@ -1,0 +1,97 @@
+#!/usr/bin/env ruby
+require '/Users/unixsuperhero/bin/h-base.rb'
+require 'net/http'
+require 'uri'
+require 'nokogiri'
+require 'bencode_ext'
+require 'pry'
+
+xdg_config = File.join(Dir.home, '.config', 'h-torrent')
+xdg_data = File.join(Dir.home, '.local', 'share', 'h-torrent').tap do |dir|
+  Dir.mkdir(dir) unless Dir.exist?(dir)
+end
+
+class Feed
+  attr_reader :url
+
+  def initialize(url)
+    @url = url
+  end
+
+  def uri = @uri ||= URI(url)
+  def rss = @rss ||= Net::HTTP.get(uri)
+  def xml = @xml ||= Nokogiri::XML(rss)
+  def items = @items ||= xml.css('item').map(&Item.method(:new))
+
+  class Item
+    attr_reader :root
+
+    def initialize(root)
+      @root = root
+    end
+
+    def title = root.css('title')&.text
+    def link = root.css('link')&.text
+  end
+end
+
+class Torrent
+  def self.fetch(url)
+    uri = URI(url)
+    data = Net::HTTP.get(uri)
+
+    new(data)
+  end
+
+  attr_reader :encoded_data
+
+  def initialize(encoded_data)
+    @encoded_data = encoded_data
+  end
+
+  def data = @data ||= data.bdecode
+  def info = @info ||= data['info']
+  def files = @files ||= info['files']
+  def file_count = @file_count ||= files ? files.count : 1
+end
+
+o = Hiiro.init(*ARGV)
+o.add_subcmd(:fetch) { |*args|
+  feed_config_path = File.join(xdg_config, 'feeds')
+
+  feeds = args
+  if feeds.none? && File.exist?(feed_config_path)
+    feeds = File.readlines(feed_config_path, chomp: true)
+  end
+
+  history = File.readlines(File.join(xdg_data, 'history'), chomp: true) rescue []
+
+  feeds.each do |feed|
+    puts format('Fetching feed: %s', feed)
+    uri = URI(feed)
+    rss = Net::HTTP.get(uri)
+
+    xml = Nokogiri::XML(rss)
+
+    torrents = xml.css('item')
+    data = torrents.map do |torrent|
+      title = torrent.css('title')&.text
+      link = torrent.css('link')&.text
+
+      if history.include?(title)
+        puts format('Skip: "%s"', title)
+        next
+      end
+
+      puts format('Fetching torrent: "%s" => "%s"', title, link)
+      torrent_uri = URI(link)
+      torrent_file = Net::HTTP.get(torrent_uri)
+
+      torrent_data = torrent_file.bdecode
+    end
+
+    binding.pry
+  end
+}
+
+o.run
