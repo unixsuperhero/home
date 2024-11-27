@@ -22,9 +22,9 @@ o.add_subcmd(:vids) { |outfile, *args|
 <html>
   <head>
     <style>
-      a, p, video {
+      /* a, p, video {
         margin-top: 20px;
-      }
+      } */
       select, textarea {
         margin-top: 20px;
         width: 80%;
@@ -33,7 +33,8 @@ o.add_subcmd(:vids) { |outfile, *args|
       .flex_links {
         display: flex;
         gap: 70px;
-        margin-bottom: 10px;
+        margin-top: 38px;
+        margin-bottom: 38px;
       }
       * {
         font-size: 16pt;
@@ -48,7 +49,7 @@ o.add_subcmd(:vids) { |outfile, *args|
       console.log({ favs: favs });
 
       var videos = [
-      #{videos}
+        #{videos.gsub(/\n/, "\n        ")}
       ];
 
       function create_links() {
@@ -97,6 +98,36 @@ o.add_subcmd(:vids) { |outfile, *args|
         display_favs();
       }
 
+      function rm_fav() {
+        var fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
+        var json = JSON.parse(fav_videos);
+        console.log({ favs: fav_videos, json: json });
+
+        var sel = document.getElementById('favs_select');
+        var current_index = sel.selectedIndex;
+        vid = json[current_index];
+
+        json.splice(current_index, 1)
+
+        if(vid !== undefined) {
+          localStorage.setItem('favs-#{hash}', JSON.stringify(json));
+          fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
+          json = JSON.parse(fav_videos);
+          console.log({ favs: fav_videos, json: json });
+        }
+
+        display_favs();
+
+        if(sel.length == 0) return;
+
+        if(current_index >= sel.length) {
+          current_index = sel.length - 1;
+        }
+
+        sel.selectedIndex = current_index;
+        load_fav();
+      }
+
       function load_fav() {
         var sel = document.getElementById('favs_select');
 
@@ -106,6 +137,20 @@ o.add_subcmd(:vids) { |outfile, *args|
         player.load();
         player.currentTime = 5;
         player.play();
+      }
+
+      function prev_fav() {
+        var sel = document.getElementById('favs_select');
+        if(sel.selectedIndex == 0) return;
+        sel.selectedIndex = sel.selectedIndex - 1;
+        load_fav();
+      }
+
+      function next_fav() {
+        var sel = document.getElementById('favs_select');
+        if(sel.selectedIndex >= sel.length - 1) return;
+        sel.selectedIndex = sel.selectedIndex + 1;
+        load_fav();
       }
 
       function export_favs() {
@@ -224,8 +269,10 @@ o.add_subcmd(:vids) { |outfile, *args|
     <span id="current_idx">0</span> /
     <span id="total_links">99999</span>
   </div>
+
   <select id="links" size="5" onchange="load_stats(); load_video();">
   </select>
+
   <div class="flex_links">
     <a href="javascript:void(0);" onclick="load_video()" />Load</a>
     <a href="javascript:void(0);" onclick="save_video()" />Save</a>
@@ -233,12 +280,19 @@ o.add_subcmd(:vids) { |outfile, *args|
     <a href="javascript:void(0);" onclick="next_vid()">Next Vid</a>
   </div>
 
-  <select id="favs_select" size="5">
+  <select id="favs_select" size="5" onchange="load_fav();">
   </select>
-  <a href="javascript:void(0);" onclick="load_fav()" />Load Fav</a>
+
+  <div class="flex_links">
+    <a href="javascript:void(0);" onclick="rm_fav()" />Remove Fav</a>
+    <a href="javascript:void(0);" onclick="load_fav()" />Load Fav</a>
+    <a href="javascript:void(0);" onclick="prev_fav()" />Prev Fav</a>
+    <a href="javascript:void(0);" onclick="next_fav()" />Next Fav</a>
+  </div>
 
   <select id="trash" size="5">
   </select>
+
   <div class="flex_links">
     <a href="javascript:void(0);" onclick="trash()" />Trash</a>
     <a href="javascript:void(0);" onclick="clear_trash()" />Clear</a>
