@@ -19,4 +19,5 @@ brew 'rustup-init'
 
 cask 'vlc'
 cask 'notion'
-cask 'iterm2'
+cask 'rectangle'
+# cask 'iterm2'
