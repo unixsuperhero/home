@@ -1,0 +1,20 @@
+#!/bin/bash
+
+function rip_video()
+{
+  url=${2:-`pbpaste`}
+  outpath=${3:-/Volumes/hikari/videos/av/asian_angel_full/}
+
+  echo URL: $url
+  echo OUTPATH: $outpath
+  echo
+
+  (
+    cd $outpath
+    yt-dlp -o "${1}.%(ext)s" "$url"
+    h html vids 000.html
+  )
+}
+
+rip_video "$@"
+

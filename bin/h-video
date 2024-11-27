@@ -12,6 +12,12 @@ o.add_subcmd(:resize) { |ofile, scale, nfile|
   system('ffmpeg', '-i', ofile, '-vf', scale_arg, nfile)
 }
 
+o.add_subcmd(:reencode) { |ofile, nfile|
+  raise 'arg error' if [ofile, nfile].compact.count != 2
+
+  system('ffmpeg', '-i', ofile, nfile)
+}
+
 if o.runnable?
   o.run
 else

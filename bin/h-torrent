@@ -132,6 +132,8 @@ o.add_subcmd(:fetch) { |*args|
 
       list << Torrent.fetch(item.link)
 
+      # TODO: ignore if (normalized?) title includes any ignore patterns
+
       history.append(item.title)
       break list if list.count >= 10
 
