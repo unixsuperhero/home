@@ -2,7 +2,7 @@ setopt EXTENDED_GLOB
 setopt PROMPT_VARS
 disable -p '#'
 
-export WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
+export WORDCHARS="${WORDCHARS/\//}"
 
 . $(brew --prefix)/etc/profile.d/z.sh
 
@@ -115,13 +115,6 @@ function pad() {
 
 export PS1=$'\n'"%~ \$(git_prompt_info)"$'\n'"%#> "
 
-# # openssl
-# export PATH="/opt/homebrew/opt/openssl@1.1/bin:$PATH"
-# export LDFLAGS="-L/opt/homebrew/opt/openssl@1.1/lib"
-# export CPPFLAGS="-I/opt/homebrew/opt/openssl@1.1/include"
-# export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@1.1/lib/pkgconfig"
-# export RUBY_CONFIGURE_OPTS="--with-openssl-dir=/opt/homebrew/opt/openssl@1.1"
-
 alias wo="timer 30m && terminal-notifier -message 'Pomodoro'\
         -title 'Work Timer is up! Take a Break 😊'\
         -sound Crystal"
@@ -133,21 +126,6 @@ alias br="timer 10m && terminal-notifier -message 'Pomodoro'\
 export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
 source <(starship init zsh --print-full-init)
 
-
-
-# image="/Users/unixsuperhero/Downloads/mina-iterm.jpg"
-# width=1600
-# height=600
-# printf -v iterm_cmd '\e]1337;File=width=%spx;height=%spx;inline=1:%s' "$width" "$height" "$(base64 < "$image")"
-#
-# # Tmux requires an additional escape sequence for this to work.
-# # [[ -n "$TMUX" ]] && printf -v iterm_cmd '\ePtmux;\e%b\e'\\ "$iterm_cmd"
-#
-# printf '%b\a\n' "$iterm_cmd"
-# alias berof="ber --only-failures"
-
-# . "$HOME/.asdf/asdf.sh"
-# export PATH="/opt/homebrew/opt/openssl@1.1/bin:$PATH"
 eval "$(rbenv init -)"
 export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
 
