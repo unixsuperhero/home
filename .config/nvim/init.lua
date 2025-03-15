@@ -356,6 +356,8 @@ vim.keymap.set('n', '<leader>q', ':q<cr>')
 vim.keymap.set('n', 'cob', ':set buftype=nofile<cr>')
 vim.keymap.set('n', 'coB', ':set buftype=<cr>')
 vim.keymap.set('n', 'cow', ':set invwrap<cr>')
+vim.keymap.set('n', ',t', ':!rspec <c-r>=expand("%")<cr><cr>')
+vim.keymap.set('n', ',T', ':!rspec <c-r>=expand("%")<cr>:<c-r>=line(".")<cr><cr>')
 
 function ShowFileStructure()
   local curpath = vim.fn.expand('%')
