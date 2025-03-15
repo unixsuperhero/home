@@ -3,20 +3,37 @@
 # Please adapt and uncomment the following lines:
 name = Joshua Toyota
 email = jearsh@gmail.com
+[init]
+  defaultBranch = main
+[core]
+  whitespace = trailing-space,tab-in-indent,cr-at-eol,blank-at-eol,blank-at-eof
+  fsmonitor = true
+[diff]
+  algorithm = histogram
+  colorMoved = plain
+  mnemonicPrefix = true
+  renames = true
+[push]
+  default = simple
+  autoSetupRemote = true
+[pull]
+  rebase = true
+[rebase]
+  autoSquash = true
+  autoStash = true
+  updateRefs = true
+[merge]
+  conflictstyle = diff3
+[merge]
+  stat = true
+[credential]
+  helper = osxkeychain
+[url "git@github.com:"]
+  insteadOf = https://github.com/
+[feature]
+  manyFiles = true
 
 [alias]
   aa = add --all
-  amend = commit --amend --no-edit
-  b = branch
-  c = commit -m
   cb = branch --show-current
   conflicts = diff development --name-only --diff-filter=U
-  dd = diff development --name-only --diff-filter=d
-  lod = log --oneline --decorate
-  lodd = log --oneline --decorate -10
-  lol = log --oneline --pretty=format:'%C(auto)%h%d%Creset %C(cyan)(%cr)%Creset %C(green)%cn <%ce>%Creset %s'
-  lsm = diff master --name-only --diff-filter=d
-  pod = pull origin development
-  pom = pull origin master
-[init]
-	defaultBranch = main
