@@ -80,6 +80,7 @@ require('lazy').setup({
   'tpope/vim-rsi',
   'tpope/vim-endwise',
   'tpope/vim-surround',
+  'tpope/vim-abolish',
   'vim-ruby/vim-ruby',
   'godlygeek/tabular',
   'jremmen/vim-ripgrep',
@@ -119,9 +120,6 @@ require('lazy').setup({
       'rafamadriz/friendly-snippets',
     },
   },
-
-  -- Useful plugin to show you pending keybinds.
-  { 'folke/which-key.nvim', opts = {} },
 
   {
     -- Adds git related signs to the gutter, as well as utilities for managing changes
@@ -195,28 +193,6 @@ require('lazy').setup({
         -- Text object
         map({ 'o', 'x' }, 'ih', ':<C-U>Gitsigns select_hunk<CR>', { desc = 'select git hunk' })
       end,
-    },
-  },
-
-  {
-    -- Set lualine as statusline
-    'nvim-lualine/lualine.nvim',
-    -- See `:help lualine.txt`
-    opts = {
-      options = {
-        icons_enabled = false,
-        theme = 'solarized_dark',
-        component_separators = '|',
-        section_separators = '',
-      },
-      sections = {
-        lualine_c = {
-          {
-            'filename',
-            path = 1,
-          },
-        },
-      },
     },
   },
 
@@ -358,6 +334,8 @@ vim.keymap.set('n', 'coB', ':set buftype=<cr>')
 vim.keymap.set('n', 'cow', ':set invwrap<cr>')
 vim.keymap.set('n', ',t', ':!rspec <c-r>=expand("%")<cr><cr>')
 vim.keymap.set('n', ',T', ':!rspec <c-r>=expand("%")<cr>:<c-r>=line(".")<cr><cr>')
+vim.keymap.set('n', ']C', '/[<>|=]\\{7\\}<cr>')
+vim.keymap.set('n', '[C', '?[<>|=]\\{7\\}<cr>')
 
 function ShowFileStructure()
   local curpath = vim.fn.expand('%')
@@ -600,24 +578,6 @@ local on_attach = function(_, bufnr)
   end, { desc = 'Format current buffer with LSP' })
 end
 
--- document existing key chains
-require('which-key').register {
-  ['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
-  ['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
-  ['<leader>g'] = { name = '[G]it', _ = 'which_key_ignore' },
-  ['<leader>h'] = { name = 'Git [H]unk', _ = 'which_key_ignore' },
-  ['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
-  ['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
-  ['<leader>t'] = { name = '[T]oggle', _ = 'which_key_ignore' },
-  ['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
-}
--- register which-key VISUAL mode
--- required for visual <leader>hs (hunk stage) to work
-require('which-key').register({
-  ['<leader>'] = { name = 'VISUAL <leader>' },
-  ['<leader>h'] = { 'Git [H]unk' },
-}, { mode = 'v' })
-
 -- mason-lspconfig requires that these setup functions are called in this order
 -- before setting up the servers.
 require('mason').setup()
@@ -776,5 +736,13 @@ local function dupe_slide()
 end
 
 vim.keymap.set('n', ',sd', dupe_slide)
+
+local function bottom_split_terminal()
+  vim.cmd("split")          -- Create a horizontal split
+  vim.cmd("wincmd J")       -- Move the split to the bottom
+  vim.cmd("term")           -- Open a terminal in the current window
+end
+
+vim.api.nvim_create_user_command("T", bottom_split_terminal, {})
 
 -- vim: ts=2 sts=2 sw=2 et
