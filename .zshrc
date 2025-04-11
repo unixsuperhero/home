@@ -60,6 +60,8 @@ alias bers="bundle exec rspec \$(gddev | specs)"
 alias berof="bundle exec rspec --only-failures"
 alias dirty="bundle exec rspec \$(gss | specs)"
 
+alias gorb="test \$? -eq 0 && say good || say bad"
+
 function file_exists {
   while read fn
   do
