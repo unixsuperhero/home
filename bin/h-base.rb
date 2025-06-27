@@ -66,6 +66,8 @@ class Hiiro
       if subcmd
         if matching_bins.count == 1
           Bin.new(matching_bins.first)
+        elsif exact_match = match_exact_bin
+          Bin.new(exact_match)
         else
           Handler.new(handler)
         end
@@ -121,6 +123,14 @@ class Hiiro
     return if subcmd.nil?
 
     @match_exact_subcommand ||= subcommands.find { |k| k == subcmd }
+  end
+
+  def match_exact_bin
+    matching_bins.find { |bin| File.basename(bin) == exact_bin_name }
+  end
+
+  def exact_bin_name
+    @exact_bin_name = "#{bin}-#{subcmd}"
   end
 
   def matching_subcommands
