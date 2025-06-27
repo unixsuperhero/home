@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require '/Users/unixsuperhero/bin/h-base.rb'
+require File.join(Dir.home, 'bin/h-base.rb')
 
 o = Hiiro.init(*ARGV)
 

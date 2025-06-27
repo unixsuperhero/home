@@ -5,7 +5,7 @@ require 'pathname'
 root = `git rev-parse --show-toplevel`.chomp
 
 STDIN.readlines(chomp: true).each do |line|
-  abspath = File.join(root, line)
+  abspath = line.start_with?(root) ? line : File.join(root, line)
   path = Pathname.new(abspath)
   relpath = path.relative_path_from(Dir.pwd)
   puts relpath

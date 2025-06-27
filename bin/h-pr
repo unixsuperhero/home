@@ -1,0 +1,132 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+require File.join(Dir.home, 'bin', 'h-base.rb')
+
+class Pr
+  attr_reader :data
+
+  def self.prs_from_json(json)
+    JSON.parse(json).each_with_object({}) do |pr, h|
+      o = new(pr)
+
+      h[o.number] = o
+    end
+  rescue => e
+    puts "ERROR: #{e.message}; json: #{json}"
+    :failed
+  end
+
+  def initialize(data)
+    @data = data
+  end
+
+  def author = data.dig(*%w[author login])
+  def branch = data["headRefName"]
+  def number = data["number"]
+
+  def is_draft = data["isDraft"]
+  def merge_state_status = data["mergeStateStatus"]
+  def mergeable = data["mergeable"]
+  def review_decision = data["reviewDecision"]
+  def state = data["state"]
+  def title = data["title"]
+  def url = data["url"]
+  def comments = data["comments"]
+  def comment_count = comments.count
+
+  def to_h
+    {
+      number:,
+      branch:,
+      author:,
+      is_draft:,
+      merge_state_status:,
+      mergeable:,
+      review_decision:,
+      state:,
+      title:,
+      url:,
+      comment_count:,
+    }
+  end
+
+  def diff(old_pr)
+    new_values = to_h
+    old_values = old_pr.to_h
+
+    return {} if old_values.empty?
+
+    diff = new_values.each_with_object({}) do |(k, v), h|
+      next if old_values[k] == v
+
+      h[k] = [old_values[k], v]
+    end
+  end
+end
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:edit) { |*args|
+  nvim = ENV['EDITOR']
+  system(nvim, __FILE__)
+}
+
+o.add_subcmd(:history) { |*pr_numbers|
+  pr_numbers.each do |pr_num|
+    puts
+    puts "# PR ##{pr_num}"
+    puts "==============="
+
+    files = `egrep -l "#{pr_num}" tmp/prs.*.json`.lines(chomp: true).sort
+
+    last_pr = nil
+    files.each do |cur_file|
+      json = IO.read(cur_file)
+
+      timestamp = cur_file[/\d\d*/]
+
+      prs = Pr.prs_from_json(json) rescue :failed
+      next if prs == :failed
+
+      cur_pr = prs[pr_num.to_i]
+
+      if last_pr.nil?
+        last_pr = cur_pr
+
+        puts "timestamp: #{timestamp}"
+        cur_pr.to_h.each do |k, v|
+          puts "#{k} STARTED AT #{v.inspect}"
+        end
+
+        puts
+
+        next
+      end
+
+      changes = cur_pr.diff(last_pr)
+      last_pr = cur_pr
+
+      next if changes.empty?
+
+      puts "timestamp: #{timestamp}"
+      changes.each do |k, (old_v, new_v)|
+        puts "#{k} CHANGED FROM #{old_v.inspect} TO #{new_v.inspect}"
+      end
+
+      puts
+    end
+  end
+}
+
+if o.runnable?
+  o.run
+else
+  puts format('ERROR: %s', :no_runnable_found)
+
+  puts
+
+  o.help
+end
+

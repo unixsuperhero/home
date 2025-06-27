@@ -1,0 +1,6 @@
+#!/bin/bash
+
+BASE_DIR="${BASE_DIR:-$1}"
+
+git diff --relative --name-only  master $BASE_DIR | rg _spec.rb
+
