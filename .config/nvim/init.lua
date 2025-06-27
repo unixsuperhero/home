@@ -332,8 +332,8 @@ vim.keymap.set('n', '<leader>q', ':q<cr>')
 vim.keymap.set('n', 'cob', ':set buftype=nofile<cr>')
 vim.keymap.set('n', 'coB', ':set buftype=<cr>')
 vim.keymap.set('n', 'cow', ':set invwrap<cr>')
-vim.keymap.set('n', ',t', ':!bundle exec rspec <c-r>=expand("%")<cr><cr>')
-vim.keymap.set('n', ',T', ':!bundle exec rspec <c-r>=expand("%")<cr>:<c-r>=line(".")<cr><cr>')
+vim.keymap.set('n', ',t', ':sp|wincmd J<cr>:let @j="bundle exec rspec " . @%<cr>:term<cr>"jpa<cr>')
+vim.keymap.set('n', ',T', ':sp|wincmd J<cr>:let @j="bundle exec rspec " . @% . ":" . line(".")<cr>:term<cr>"jpa<cr>')
 vim.keymap.set('n', ']C', '/[<>|=]\\{7\\}<cr>')
 vim.keymap.set('n', '[C', '?[<>|=]\\{7\\}<cr>')
 
@@ -521,7 +521,7 @@ vim.defer_fn(function()
         },
       },
       swap = {
-        enable = true,
+        enable = false,
         swap_next = {
           ['<leader>a'] = '@parameter.inner',
         },
@@ -668,6 +668,8 @@ vim.keymap.set("n", "<C-h>4", function() harpoon:list():select(4) end)
 vim.keymap.set("n", "<C-h><C-n>", function() harpoon:list():prev() end)
 vim.keymap.set("n", "<C-h><C-p>", function() harpoon:list():next() end)
 
+vim.keymap.set('n', '<C-w>f', ':vert wincmd f<cr>')
+
 -- [[ Configure nvim-cmp ]]
 -- See `:help cmp`
 local cmp = require 'cmp'
@@ -743,6 +745,19 @@ local function bottom_split_terminal()
   vim.cmd("term")           -- Open a terminal in the current window
 end
 
+function Ls_l(opts)
+  local args = opts.args
+
+  if #opts.args == 0 then
+    args = vim.api.nvim_buf_get_name(0)
+  end
+
+  local cmd = "!ls -l " .. args
+
+  vim.cmd(cmd)           -- Open a terminal in the current window
+end
+
 vim.api.nvim_create_user_command("T", bottom_split_terminal, {})
+vim.api.nvim_create_user_command("Lsl", Ls_l, { nargs = "*"})
 
 -- vim: ts=2 sts=2 sw=2 et
