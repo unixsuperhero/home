@@ -1,0 +1,27 @@
+#!/bin/bash
+
+mkdir -pv tmp
+
+sha="$(git log --oneline -1 | sed 's/\(.......\).*/\1/')"
+echo "SHA: $sha"
+false
+
+echo
+
+while true
+do
+  clear
+
+  echo "SHA: $sha"
+  echo
+
+  isc builds "partners@${sha}" | tee tmp/builds
+
+  egrep -i 'no builds' tmp/builds &>/dev/null && continue
+
+  (tail +2 tmp/builds | head -1 | egrep "^.*${sha}[^[:space:]]*[[:space:]]+\bsucceeded") &>/dev/null && break
+  sleep 2
+done
+
+say 'build complete'
+

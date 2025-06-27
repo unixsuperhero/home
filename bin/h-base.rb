@@ -55,7 +55,9 @@ class Hiiro
 
   def run
     if runnable?
-      runnable.run(*args)
+      success = runnable.run(*args)
+
+      exit 1 unless success
     end
   end
 
@@ -64,7 +66,7 @@ class Hiiro
       if subcmd
         if matching_bins.count == 1
           Bin.new(matching_bins.first)
-        elsif matching_subcommands.length == 1
+        else
           Handler.new(handler)
         end
       end
@@ -73,6 +75,13 @@ class Hiiro
 
   def runnable?
     !runnable.nil?
+  end
+
+  def help
+    puts 'Possible Subcommands:'
+    subcommands.sort.each do |s|
+      puts format('  %s', s)
+    end
   end
 
   def matching_bins
@@ -103,7 +112,15 @@ class Hiiro
     matches = matching_subcommands
     if matches.length == 1
       @handler ||= handlers.fetch(matches.first.to_s)
+    elsif matches.length > 1
+      @handler ||= handlers.fetch(match_exact_subcommand)
     end
+  end
+
+  def match_exact_subcommand
+    return if subcmd.nil?
+
+    @match_exact_subcommand ||= subcommands.find { |k| k == subcmd }
   end
 
   def matching_subcommands
@@ -150,6 +167,49 @@ class Hiiro
 
     def run(*args)
       handler.call(*args)
+    end
+  end
+
+  class Args
+    attr_reader :raw_args
+
+    def initialize(*raw_args)
+      @raw_args = raw_args
+    end
+
+    def flags
+      @flags ||= proc {
+        raw_args.select { |arg|
+          arg.match?(/^-[^-]/)
+        }.flat_map { |arg|
+          arg.sub(/^-/, '').chars
+        }
+      }.call
+    end
+
+    def flag?(flag)
+      flags.include?(flag)
+    end
+
+    def flag_value(flag)
+      found_flag = false
+      raw_args.each do |arg|
+        if found_flag
+          return arg
+        end
+
+        if arg.match?(/^-\w*#{flag}/)
+          found_flag = true
+        end
+      end
+
+      nil
+    end
+
+    def values
+      raw_args.reject do |arg|
+        arg.match?(/^-/)
+      end
     end
   end
 end

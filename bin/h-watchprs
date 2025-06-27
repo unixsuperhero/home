@@ -1,0 +1,213 @@
+#!/usr/bin/env ruby
+
+require 'pry'
+require 'json'
+require 'digest'
+
+prs = { '572233' => 'pending' }
+approvals = {}
+first_run = true
+
+last_prs = {}
+last_json_md5 = nil
+
+class Pr
+  attr_reader :data
+
+  def self.prs_from_json(json)
+    JSON.parse(json).each_with_object({}) do |pr, h|
+      o = new(pr)
+
+      h[o.number] = o
+    end
+  end
+
+  def initialize(data)
+    @data = data
+  end
+
+  def author = data.dig(*%w[author login])
+  def branch = data["headRefName"]
+  def number = data["number"]
+
+  def is_draft = data["isDraft"]
+  def merge_state_status = data["mergeStateStatus"]
+  def mergeable = data["mergeable"]
+  def review_decision = data["reviewDecision"]
+  def state = data["state"]
+  def title = data["title"]
+  def url = data["url"]
+  def comments = data["comments"]
+  def comment_count = comments.count
+
+  def to_h
+    {
+      number:,
+      branch:,
+      author:,
+      is_draft:,
+      merge_state_status:,
+      mergeable:,
+      review_decision:,
+      state:,
+      title:,
+      url:,
+      comment_count:,
+    }
+  end
+
+  def diff(old_pr)
+    new_values = to_h
+    old_values = old_pr.to_h
+
+    diff = new_values.each_with_object({}) do |(k, v), h|
+      next if old_values[k] == v
+
+      h[k] = [old_values[k], v]
+    end
+  end
+end
+
+loop do
+  puts
+  puts "# JSON VERSION"
+  puts
+
+  json = `gh pr status --json number,author,headRefName,isDraft,mergeStateStatus,mergeable,reviewDecision,state,title,url,comments --jq '.createdBy'`
+
+  json_md5 = Digest::MD5.hexdigest(json)
+
+  if last_json_md5 && last_json_md5 == json_md5
+    puts "skipping...api result is the same"
+    sleep(30)
+    next
+  end
+
+  last_json_md5 = json_md5
+
+  outfile = "tmp/prs.#{Time.now.strftime('%Y%m%d%H%M%S')}.json"
+  File.write(outfile, json)
+
+  readable_json = `cat #{outfile} | jq`
+  File.write(outfile, readable_json)
+
+  prs = Pr.prs_from_json(json)
+
+  prs.each.with_index do |(number, pr), i|
+    puts
+    puts "# ---- PR ##{i} ----"
+    puts "number: #{pr.number}"
+    puts "author: #{pr.author}"
+    puts "branch: #{pr.branch}"
+    puts "draft: #{pr.is_draft}"
+    puts "merge_state_status: #{pr.merge_state_status}"
+    puts "mergeable: #{pr.mergeable}"
+    puts "state: #{pr.state}"
+    puts "review_decision: #{pr.review_decision}"
+    puts "url: #{pr.url}"
+    puts "title: #{pr.title}"
+    puts "comment_count: #{pr.comment_count}"
+    puts "# ---- END PR ##{i} ----"
+    puts
+
+    last_pr = last_prs[number]
+    diff = pr.diff(last_pr)
+
+    unless diff.empty?
+      puts "# DIFF => #{pr.number}"
+      puts "number: #{pr.number}"
+
+      diff.each do |k, (old_v, new_v)|
+        puts "#{k} CHANGED FROM #{old_v.inspect} TO #{new_v.inspect}"
+      end
+    end
+  end
+
+  last_prs = prs
+  # next
+  #
+  # puts
+  # puts "# TEXT VERSION"
+  # puts
+  #
+  # stdout = `gh pr status`
+  #
+  # md5 = Digest::MD5.hexdigest(stdout)
+  #
+  # first_run = false
+  #
+  # if stdout.match?(/something went wrong/i)
+  #   sleep 60
+  #   next
+  # end
+  #
+  # collecting = false
+  # current_pr = nil
+  # new_statuses = {}
+  # new_approvals = {}
+  # stdout.lines(chomp: true).map do |line|
+  #   collecting = true if line.match?(/created by you/i)
+  #   next unless collecting
+  #
+  #   if num = line[/[#]\d+/]
+  #     current_pr = num.sub(?#, '')
+  #     next
+  #   end
+  #
+  #   if current_pr && line.match?(/checks (pending|passing|failing)/i)
+  #     new_status = line[/pending|passing|failing/]
+  #
+  #     old_approval_count = approvals.fetch(current_pr, 0)
+  #
+  #     if line.match?(/✓ (\d\d*) Approved/)
+  #       partial = line[/✓ (\d\d*) Approved/]
+  #       approval_count = partial[/\d\d*/]
+  #       new_approvals[current_pr] = approval_count
+  #     end
+  #
+  #     approvals[current_pr]
+  #     new_statuses[current_pr] = new_status
+  #     current_pr = nil
+  #   end
+  #
+  #   break if line.match?(/^\s*$/)
+  # end
+  #
+  # status_changed = new_statuses.any?{|pr,new_status| prs[pr] != new_status }
+  # approvals_changed = new_approvals.any?{|pr,new_approval_count| approvals[pr] != new_approval_count }
+  #
+  # if status_changed || approvals_changed
+  #   puts
+  # end
+  #
+  # new_approvals.each do |current_pr, new_approval|
+  #   if approvals.has_key?(current_pr)
+  #     if approvals[current_pr] != new_approval
+  #       system('say', 'pr', 'has', new_approval, 'approvals')
+  #       puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
+  #     end
+  #   else
+  #     system('say', 'pr', 'has', new_approval, 'approvals')
+  #     puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
+  #   end
+  # end
+  #
+  # new_statuses.each do |current_pr, new_status|
+  #   if prs[current_pr] != new_status
+  #     system('say', 'pr', 'is', new_status)
+  #
+  #     if new_status[/passing/] && current_pr.to_s != '626643'
+  #       system('say', 'publishing pr')
+  #       system('gh', 'pr', 'ready', current_pr)
+  #       system('gh', 'pr', 'view', '-w', current_pr)
+  #     end
+  #
+  #     puts format('%7s (%s): https://github.com/instacart/carrot/pull/%s', current_pr, new_status, current_pr)
+  #   end
+  # end
+  #
+  # prs = new_statuses
+  # approvals = new_approvals
+  #
+  # sleep 60
+end
