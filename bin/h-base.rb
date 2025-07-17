@@ -6,6 +6,8 @@ require 'json'
 require 'digest'
 require 'digest/sha1'
 
+DEFAULT_KEY = 'DEFAULT'.freeze
+
 class Directory
   def self.temp_cd(dir, &block)
     pwd = Dir.pwd
@@ -53,7 +55,7 @@ class Hiiro
   def initialize(bin, *original_args)
     @bin = bin
     @original_args = original_args
-    @handlers = { "DEFAULT" => default_block }
+    @handlers = {}
   end
 
   def run
@@ -64,13 +66,38 @@ class Hiiro
 
   def runnable
     @runnable ||= lambda {
-      if subcmd
-        return Bin.new(match_exact_bin) if match_exact_bin
-        return Bin.new(matching_bins.first) if matching_bins.count == 1
+      if !subcmd && has_default_handler?
+        return default_handler
       end
 
-      Handler.new(handler)
+      if matching_bin
+        Bin.new(matching_bin)
+      elsif matching_subcommand
+        Handler.new(matching_subcommand, handlers[matching_subcommand])
+      elsif has_default_handler?
+        default_handler
+      end
     }.call
+  end
+
+  def matching_bin
+    if matching_bins.count == 1
+      matching_bins.first
+    else
+      matching_bins.find{|bin| bin == [$PROGRAM_NAME, subcmd].join(?-) }
+    end
+  end
+
+  def matching_subcommand
+    if matching_subcommands.count == 1
+      matching_subcommands.first
+    else
+      matching_subcommands.find{|name| name == subcmd }
+    end
+  end
+
+  def default_handler
+    Handler.new(DEFAULT_KEY, handlers[DEFAULT_KEY]) if has_default_handler?
   end
 
   def runnable?
@@ -92,12 +119,24 @@ class Hiiro
     @subcmd ||= original_args.first.dup
   end
 
+  def has_default_handler?
+    handlers.key?(DEFAULT_KEY)
+  end
+
+  def default_handler?
+    runnable? && runnable.default?
+  end
+
   def args
-    @args ||= original_args[1..]
+    if default_handler?
+      [subcmd, *original_args[1..]]
+    else
+      original_args[1..]
+    end
   end
 
   def add_default(&block)
-    handlers["DEFAULT"] = block
+    handlers[DEFAULT_KEY] = block
   end
 
   def add_subcmd(name, &block)
@@ -109,16 +148,8 @@ class Hiiro
   end
 
   def handler
-    return @handler if @handler
-
-    matches = matching_subcommands
-
-    if matches.length == 1
-      @handler = handlers.fetch(matches.first.to_s)
-    elsif matches.length > 1
-      @handler = handlers.fetch(match_exact_subcommand)
-    else
-      @handler = default_block
+    if runnable?
+      @handler ||= runnable
     end
   end
 
@@ -130,27 +161,9 @@ class Hiiro
     end
   end
 
-  def match_exact_subcommand
-    return if subcmd.nil?
-
-    @match_exact_subcommand ||= subcommands.find { |k| k == subcmd }
-  end
-
-  def match_exact_bin
-    matching_bins.find { |bin| File.basename(bin) == exact_bin_name }
-  end
-
-  def exact_bin_name
-    @exact_bin_name = "#{bin}-#{subcmd}"
-  end
-
   def matching_subcommands
-    return [] if subcmd.nil?
-
-    @matching_subcommands ||= proc {
-      matches = subcommands.select { |k| k[/^#{subcmd}/i] }
-      matches.map(&:to_sym)
-    }.call
+    @matching_subcommands ||=
+      subcommands.select { |k| k[/^#{subcmd}/i] }
   end
 
   class Bin
@@ -164,14 +177,15 @@ class Hiiro
       relative_matches
     end
 
-    attr_reader :runner
+    attr_reader :name, :bin
 
-    def initialize(runner)
-      @runner = runner
+    def initialize(bin)
+      @name = File.basename(bin)
+      @bin = bin
     end
 
-    def source
-      runner
+    def default?
+      false
     end
 
     def run(*args)
@@ -180,16 +194,15 @@ class Hiiro
   end
 
   class Handler
-    attr_reader :runner
+    attr_reader :name, :handler
     
-    def initialize(runner)
-      @runner = runner
+    def initialize(name, handler)
+      @name = name
+      @handler = handler
     end
 
-    def source
-      puts runner.source
-
-      runner.source
+    def default?
+      @name == DEFAULT_KEY
     end
 
     def run(*args)
