@@ -3,6 +3,7 @@ setopt PROMPT_VARS
 disable -p '#'
 
 export WORDCHARS="${WORDCHARS/\//}"
+export BC_ENV_ARGS="-l"
 
 . $(brew --prefix)/etc/profile.d/z.sh
 
@@ -133,6 +134,6 @@ source <(starship init zsh --print-full-init)
 eval "$(rbenv init -)"
 export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
 
-[[ -n $SSH_CLIENT && -z $VIM && -z $TMUX ]] && tmux new -A -s remote
+[[ -n $SSH_CONNECTION && -z $VIM && -z $TMUX ]] && tmux new -A -s remote
 
-
+export TERM=screen-256color

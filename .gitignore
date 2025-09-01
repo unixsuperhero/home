@@ -88,3 +88,4 @@ yt-audio/
 backup.notes/
 notes.old/
 .aspnet
+.config/yt-dlp/
