@@ -21,7 +21,7 @@ email = jearsh@gmail.com
 [rebase]
   autoSquash = true
   autoStash = true
-  updateRefs = true
+  updateRefs = false
 [merge]
   conflictstyle = diff3
 [merge]
