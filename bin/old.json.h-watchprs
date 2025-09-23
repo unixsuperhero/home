@@ -1,0 +1,98 @@
+#!/usr/bin/env ruby
+
+require 'pry'
+require 'json'
+require 'digest'
+require File.join(Dir.home, 'bin', 'pr.rb')
+
+prs = {}
+last_prs = {}
+last_json_md5 = nil
+
+loop do
+  puts "# FETCHING"
+
+  json = `gh pr status --json number,author,headRefName,isDraft,mergeStateStatus,mergeable,reviewDecision,state,title,url,comments --jq '.createdBy'`
+
+  json_md5 = Digest::MD5.hexdigest(json)
+
+  prs = Pr.prs_from_json(json)
+
+  if prs == :failed
+    sleep 20
+    next
+  end
+
+  if last_json_md5 && last_json_md5 == json_md5
+    puts "skipping...api result is the same"
+    puts "PRs => #{prs.keys.inspect}"
+    sleep(30)
+    next
+  end
+
+  outfile = "tmp/prs.#{Time.now.strftime('%Y%m%d%H%M%S')}.json"
+  File.write(outfile, json)
+
+  readable_json = `cat #{outfile} | jq`
+  File.write(outfile, readable_json)
+
+  last_json_md5 = json_md5
+
+  prs.each.with_index do |(number, pr), i|
+    puts
+    puts "# ---- PR ##{i} ----"
+    puts "number: #{pr.number}"
+    puts "author: #{pr.author}"
+    puts "branch: #{pr.branch}"
+    puts "draft: #{pr.is_draft}"
+    puts "merge_state_status: #{pr.merge_state_status}"
+    puts "mergeable: #{pr.mergeable}"
+    puts "state: #{pr.state}"
+    puts "review_decision: #{pr.review_decision}"
+    puts "url: #{pr.url}"
+    puts "title: #{pr.title}"
+    puts "comment_count: #{pr.comment_count}"
+    puts "# ---- END PR ##{i} ----"
+    puts
+
+    last_pr = last_prs[number]
+    diff = pr.diff(last_pr)
+
+    status_fields = %i[merge_state_status mergeable review_decision state]
+
+    unless diff.empty?
+      puts "# DIFF => #{pr.number}"
+      puts "number: #{pr.number}"
+      puts
+      puts "VALUES:"
+      puts "  number: #{pr.number}"
+      puts "  author: #{pr.author}"
+      puts "  branch: #{pr.branch}"
+      puts "  draft: #{pr.is_draft}"
+      puts "  merge_state_status: #{pr.merge_state_status}"
+      puts "  mergeable: #{pr.mergeable}"
+      puts "  state: #{pr.state}"
+      puts "  review_decision: #{pr.review_decision}"
+      puts "  url: #{pr.url}"
+      puts "  title: #{pr.title}"
+      puts "  comment_count: #{pr.comment_count}"
+      puts
+
+      next if pr.mergeable == "UNKNOWN" && pr.merge_state_status == "UNKNOWN"
+      words = "pr ##{pr.number} changed.  "
+      diff.each do |k, (old_v, new_v)|
+        puts "#{k} CHANGED FROM #{old_v.inspect} TO #{new_v.inspect}"
+        words += "#{k} is now #{new_v}.  "
+      end
+
+      system('say', words)
+    end
+
+    # if pr.ready_for_review?
+    #   system('say', 'publishing pr')
+    #   system('gh', 'pr', 'ready', pr.number.to_s)
+    # end
+  end
+
+  last_prs = prs
+end

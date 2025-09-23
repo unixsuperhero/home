@@ -32,3 +32,8 @@ format = '(\([$staged](green)[$conflicted$stashed$deleted$renamed$modified$untra
 
 [git_branch]
 format = '[$symbol$branch(:$remote_branch)]($style) '
+
+[time]
+disabled = false
+time_format = '%Y-%m-%d %H:%M:%S '
+format = "[$time]($style)"

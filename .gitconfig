@@ -1,8 +1,6 @@
-# This is Git's per-user configuration file.
 [user]
-# Please adapt and uncomment the following lines:
-name = Joshua Toyota
-email = jearsh@gmail.com
+  name = Joshua Toyota
+  email = jearsh@gmail.com
 [init]
   defaultBranch = main
 [core]
@@ -32,8 +30,15 @@ email = jearsh@gmail.com
   insteadOf = https://github.com/
 [feature]
   manyFiles = true
-
 [alias]
   aa = add --all
   cb = branch --show-current
-  conflicts = diff development --name-only --diff-filter=U
+  conflicts = diff --name-only --diff-filter=U --relative
+  dd = diff development --name-only --diff-filter=d
+  lod = log --oneline --decorate
+  lodd = log --oneline --decorate -10
+  lol = log --oneline --pretty=format:'%C(auto)%h%d%Creset %C(cyan)(%cr)%Creset %C(green)%cn <%ce>%Creset %s'
+  lsm = diff master --name-only --diff-filter=d
+  pod = pull origin development
+  pom = pull origin master
+  root = rev-parse --show-toplevel

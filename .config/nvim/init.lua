@@ -277,8 +277,13 @@ vim.o.expandtab = true
 --  See `:help 'clipboard'`
 vim.o.clipboard = 'unnamedplus'
 
--- Enable break indent
-vim.o.breakindent = true
+-- Wrapping Text
+vim.o.wrap = false
+vim.o.textwidth = 80
+vim.o.wrapmargin = 10
+vim.o.linebreak = true -- break at word boundaries 'breakat' opt
+vim.o.breakindent = true -- maintain indentation when wrapping
+vim.o.scrolloff = 3
 
 -- Save undo history
 vim.o.undofile = true
@@ -757,7 +762,41 @@ function Ls_l(opts)
   vim.cmd(cmd)           -- Open a terminal in the current window
 end
 
+local function copy_github_link(opts)
+  local args = opts.args
+
+  if #opts.args == 0 then
+    local current_buffer_name = vim.api.nvim_buf_get_name(0)
+    local current_buffer_path = vim.fn.expand("%")
+
+    args = current_buffer_path
+    vim.print('current_buffer_name: ', current_buffer_name)
+    vim.print('current_buffer_path: ', current_buffer_path)
+  end
+
+  local cmd = "!echo -n $(gh browse -n " .. args .. ") | pbcopy; pbpaste"
+
+  vim.cmd(cmd) -- copy the github link to the current buffer
+end
+
+local function open_github_link(opts)
+  local args = opts.args
+
+  if #opts.args == 0 then
+    local current_buffer_name = vim.api.nvim_buf_get_name(0)
+    local current_buffer_path = vim.fn.expand("%")
+
+    args = current_buffer_path
+  end
+
+  local cmd = "!gh browse " .. args
+
+  vim.cmd(cmd) -- copy the github link to the current buffer
+end
+
 vim.api.nvim_create_user_command("T", bottom_split_terminal, {})
 vim.api.nvim_create_user_command("Lsl", Ls_l, { nargs = "*"})
+vim.api.nvim_create_user_command("CopyLink", copy_github_link, { nargs = "*"})
+vim.api.nvim_create_user_command("OpenLink", open_github_link, { nargs = "*"})
 
 -- vim: ts=2 sts=2 sw=2 et

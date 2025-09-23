@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -z $VIM ]; then
+if [[ -z $VIM && -z $NVIM ]]; then
   nvim "$@"
 else
   echo "args: $@"
