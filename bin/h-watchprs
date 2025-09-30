@@ -9,6 +9,7 @@ options = {
   say_approvals: true,
   say_status: true,
   say_passing: true,
+  say_publishing: true,
   mark_ready: false
 }
 
@@ -25,6 +26,10 @@ OptionParser.new do |opts|
 
   opts.on("--no-say-passing", "Disable 'say' for passing PRs") do
     options[:say_passing] = false
+  end
+
+  opts.on("--no-say-publishing", "Disable 'say' when publishing PR as ready") do
+    options[:say_publishing] = false
   end
 
   opts.on("--mark-ready", "Enable marking PR as ready when passing") do
@@ -122,7 +127,7 @@ loop do
       system('say', 'pr', 'is', new_status) if options[:say_status]
 
       if new_status[/passing/]
-        system('say', 'publishing pr') if options[:mark_ready]
+        system('say', 'publishing pr') if options[:mark_ready] && options[:say_publishing]
         system('gh', 'pr', 'ready', current_pr) if options[:mark_ready]
         system('gh', 'pr', 'view', '-w', current_pr)
       end
