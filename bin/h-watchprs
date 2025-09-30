@@ -12,69 +12,10 @@ first_run = true
 last_prs = {}
 last_json_md5 = nil
 
-class Pr
-  attr_reader :data
-
-  def self.prs_from_json(json)
-    JSON.parse(json).each_with_object({}) do |pr, h|
-      o = new(pr)
-
-      h[o.number] = o
-    end
-  end
-
-  def initialize(data)
-    @data = data
-  end
-
-  def author = data.dig(*%w[author login])
-  def branch = data["headRefName"]
-  def number = data["number"]
-
-  def is_draft = data["isDraft"]
-  def merge_state_status = data["mergeStateStatus"]
-  def mergeable = data["mergeable"]
-  def review_decision = data["reviewDecision"]
-  def state = data["state"]
-  def title = data["title"]
-  def url = data["url"]
-  def comments = data["comments"]
-  def comment_count = comments.count
-
-  def to_h
-    {
-      number:,
-      branch:,
-      author:,
-      is_draft:,
-      merge_state_status:,
-      mergeable:,
-      review_decision:,
-      state:,
-      title:,
-      url:,
-      comment_count:,
-    }
-  end
-
-  def diff(old_pr)
-    new_values = to_h
-    old_values = old_pr.to_h
-
-    diff = new_values.each_with_object({}) do |(k, v), h|
-      next if old_values[k] == v
-
-      h[k] = [old_values[k], v]
-    end
-  end
-end
-
 loop do
   stdout = `gh pr status`
 
   md5 = Digest::MD5.hexdigest(stdout)
-
-  first_run = false
 
   if stdout.match?(/something went wrong/i)
     sleep SLEEP_TIME
