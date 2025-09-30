@@ -56,6 +56,11 @@ loop do
 
   status_changed = new_statuses.any?{ |pr,new_status| prs[pr] != new_status }
   approvals_changed = new_approvals.any?{|pr,new_approval_count| approvals[pr] != new_approval_count }
+  puts(
+    prs:,
+    status_changed:,
+    approvals_changed:,
+  )
 
   if status_changed || approvals_changed
     puts
@@ -74,12 +79,18 @@ loop do
   end
 
   new_statuses.each do |current_pr, new_status|
-    if prs.key?(current_pr) && prs[current_pr] != new_status
+    old_status = prs[current_pr]
+    puts(
+      current_pr:,
+      old_status:,
+      new_status:,
+    )
+    if prs.key?(current_pr) && old_status != new_status
       system('say', 'pr', 'is', new_status)
 
       if new_status[/passing/]
-        system('say', 'publishing pr')
-        system('gh', 'pr', 'ready', current_pr)
+        # system('say', 'publishing pr')
+        # system('gh', 'pr', 'ready', current_pr)
         system('gh', 'pr', 'view', '-w', current_pr)
       end
 
