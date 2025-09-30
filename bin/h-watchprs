@@ -3,6 +3,39 @@
 require 'pry'
 require 'json'
 require 'digest'
+require 'optparse'
+
+options = {
+  say_approvals: true,
+  say_status: true,
+  say_passing: true,
+  mark_ready: false
+}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: h-watchprs [options]"
+
+  opts.on("--no-say-approvals", "Disable 'say' for new approvals") do
+    options[:say_approvals] = false
+  end
+
+  opts.on("--no-say-status", "Disable 'say' for status changes") do
+    options[:say_status] = false
+  end
+
+  opts.on("--no-say-passing", "Disable 'say' for passing PRs") do
+    options[:say_passing] = false
+  end
+
+  opts.on("--mark-ready", "Enable marking PR as ready when passing") do
+    options[:mark_ready] = true
+  end
+
+  opts.on("-h", "--help", "Prints this help") do
+    puts opts
+    exit
+  end
+end.parse!
 
 SLEEP_TIME = ENV.fetch('sleep_for', 60)
 prs = {}
@@ -69,11 +102,11 @@ loop do
   new_approvals.each do |current_pr, new_approval|
     if approvals.has_key?(current_pr)
       if approvals[current_pr] != new_approval
-        system('say', 'pr', 'has', new_approval, 'approvals')
+        system('say', 'pr', 'has', new_approval, 'approvals') if options[:say_approvals]
         puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
       end
     else
-      system('say', 'pr', 'has', new_approval, 'approvals')
+      system('say', 'pr', 'has', new_approval, 'approvals') if options[:say_approvals]
       puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
     end
   end
@@ -86,11 +119,11 @@ loop do
       new_status:,
     )
     if prs.key?(current_pr) && old_status != new_status
-      system('say', 'pr', 'is', new_status)
+      system('say', 'pr', 'is', new_status) if options[:say_status]
 
       if new_status[/passing/]
-        # system('say', 'publishing pr')
-        # system('gh', 'pr', 'ready', current_pr)
+        system('say', 'publishing pr') if options[:mark_ready]
+        system('gh', 'pr', 'ready', current_pr) if options[:mark_ready]
         system('gh', 'pr', 'view', '-w', current_pr)
       end
 
