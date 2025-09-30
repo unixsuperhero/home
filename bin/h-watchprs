@@ -16,23 +16,23 @@ options = {
 OptionParser.new do |opts|
   opts.banner = "Usage: h-watchprs [options]"
 
-  opts.on("--no-say-approvals", "Disable 'say' for new approvals") do
+  opts.on("-a", "--no-say-approvals", "Disable 'say' for new approvals") do
     options[:say_approvals] = false
   end
 
-  opts.on("--no-say-status", "Disable 'say' for status changes") do
+  opts.on("-s", "--no-say-status", "Disable 'say' for status changes") do
     options[:say_status] = false
   end
 
-  opts.on("--no-say-passing", "Disable 'say' for passing PRs") do
+  opts.on("-p", "--no-say-passing", "Disable 'say' for passing PRs") do
     options[:say_passing] = false
   end
 
-  opts.on("--no-say-publishing", "Disable 'say' when publishing PR as ready") do
+  opts.on("-u", "--no-say-publishing", "Disable 'say' when publishing PR as ready") do
     options[:say_publishing] = false
   end
 
-  opts.on("--mark-ready", "Enable marking PR as ready when passing") do
+  opts.on("-r", "--mark-ready", "Enable marking PR as ready when passing") do
     options[:mark_ready] = true
   end
 
