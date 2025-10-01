@@ -1,0 +1,4 @@
+#!/bin/bash
+
+git branch -i --sort=authordate | rg "$1" | sed 's/..//'
+

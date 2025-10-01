@@ -1,4 +1,4 @@
 #!/bin/bash
 
+git log --oneline "$@" | head -1 | sed 's/[[:space:]].*//'
 
-git log --oneline | head -1 | sed 's/[[:space:]].*//'
