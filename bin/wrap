@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Check for named pipes in arguments
+pipe_arg=""
+other_args=()
+
+for arg in "$@"; do
+  if [[ -p "$arg" ]]; then
+    pipe_arg="$arg"
+  else
+    other_args+=("$arg")
+  fi
+done
+
+# Build header: use other args if available, otherwise use pipe name
+if [[ ${#other_args[@]} -gt 0 ]]; then
+  header="${other_args[*]}"
+else
+  header="$@"
+fi
+
+echo "  $header"
+echo "==${header//?/=}=="
+
+# Cat the named pipe if found, otherwise read from stdin
+if [[ -n "$pipe_arg" ]]; then
+  cat "$pipe_arg"
+else
+  cat -
+fi
+
+echo
+echo
+echo
+
