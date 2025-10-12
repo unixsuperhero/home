@@ -168,6 +168,15 @@ class Hiiro
 
   class Bin
     def self.find(bin, subcmd)
+      exact_matches = find_exact(bin, subcmd)
+      relative_matches = find_relative(bin, subcmd)
+
+      all_matches = exact_matches + relative_matches
+
+      all_matches.uniq
+    end
+
+    def self.find_relative(bin, subcmd)
       prefix = "#{bin}-#{subcmd}*"
       paths = ENV['PATH'].split(?:).uniq.join(?,)
 
@@ -175,6 +184,16 @@ class Hiiro
       relative_matches = Dir.glob(relative_glob)
 
       relative_matches
+    end
+
+    def self.find_exact(bin, subcmd)
+      prefix = "#{bin}-#{subcmd}"
+      paths = ENV['PATH'].split(?:).uniq.join(?,)
+
+      exact_glob = "{#{paths}}/#{prefix}"
+      exact_matches = Dir.glob(exact_glob)
+
+      exact_matches
     end
 
     attr_reader :name, :bin
@@ -189,7 +208,7 @@ class Hiiro
     end
 
     def run(*args)
-      system(runner, *args)
+      system(bin, *args)
     end
   end
 
@@ -206,7 +225,7 @@ class Hiiro
     end
 
     def run(*args)
-      runner.call(*args)
+      handler.call(*args)
     end
   end
 
