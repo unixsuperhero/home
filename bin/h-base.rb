@@ -58,6 +58,14 @@ class Hiiro
     @handlers = {}
   end
 
+  # def pins
+  #   return {} unless File.exist?(File.join(Dir.home, 'pins', full_name))
+  # end
+
+  # def full_name
+  #   [$0, subcommand].join(?-)
+  # end
+
   def run
     success = runnable&.run(*args) || false
 
