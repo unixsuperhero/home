@@ -6,8 +6,6 @@ require 'json'
 require 'digest'
 require 'digest/sha1'
 
-DEFAULT_KEY = 'DEFAULT'.freeze
-
 def overlap?(shorter_string, longer_string)
   longer_string&.to_s.start_with?(shorter_string.to_s) ||
     shorter_string&.to_s.start_with?(longer_string.to_s)
@@ -64,10 +62,9 @@ class Hiiro
   def initialize(bin, *original_args)
     @bin = bin
     @original_args = original_args
-    @handlers = {}
-    # @handlers = {
-    #   DEFAULT: default_block,
-    # }.transform_keys(&:to_s)
+    @handlers = {
+      DEFAULT: default_block,
+    }.transform_keys(&:to_s)
   end
 
   def run
@@ -157,7 +154,7 @@ class Hiiro
   end
 
   def add_default(&block)
-    handlers[DEFAULT_KEY] = block
+    handlers["DEFAULT"] = block
   end
 
   def add_subcmd(*names, &block)
@@ -217,15 +214,6 @@ class Hiiro
 
   class Bin
     def self.find(bin, subcmd)
-      exact_matches = find_exact(bin, subcmd)
-      relative_matches = find_relative(bin, subcmd)
-
-      all_matches = exact_matches + relative_matches
-
-      all_matches.uniq
-    end
-
-    def self.find_relative(bin, subcmd)
       prefix = "#{bin}-#{subcmd}*"
       paths = ENV['PATH'].split(?:).uniq.join(?,)
 
@@ -235,46 +223,36 @@ class Hiiro
       relative_matches
     end
 
-    def self.find_exact(bin, subcmd)
-      prefix = "#{bin}-#{subcmd}"
-      paths = ENV['PATH'].split(?:).uniq.join(?,)
+    attr_reader :runner
 
-      exact_glob = "{#{paths}}/#{prefix}"
-      exact_matches = Dir.glob(exact_glob)
-
-      exact_matches
+    def initialize(runner)
+      @runner = runner
     end
 
-    attr_reader :name, :bin
-
-    def initialize(bin)
-      @name = File.basename(bin)
-      @bin = bin
-    end
-
-    def default?
-      false
+    def source
+      runner
     end
 
     def run(*args)
-      system(bin, *args)
+      system(runner, *args)
     end
   end
 
   class Handler
-    attr_reader :name, :handler
+    attr_reader :runner
     
-    def initialize(name, handler)
-      @name = name
-      @handler = handler
+    def initialize(runner)
+      @runner = runner
     end
 
-    def default?
-      @name == DEFAULT_KEY
+    def source
+      puts runner.source
+
+      runner.source
     end
 
     def run(*args)
-      handler.call(*args)
+      runner.call(*args)
     end
   end
 
