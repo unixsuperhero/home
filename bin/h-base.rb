@@ -6,7 +6,14 @@ require 'json'
 require 'digest'
 require 'digest/sha1'
 
-DEFAULT_KEY = 'DEFAULT'.freeze
+def overlap?(shorter_string, longer_string)
+  longer_string&.to_s.start_with?(shorter_string.to_s) ||
+    shorter_string&.to_s.start_with?(longer_string.to_s)
+end
+
+def any_overlap?(list, longer_string)
+  list.any? { |shorter_string| overlap?(shorter_string, longer_string) }
+end
 
 class Directory
   def self.temp_cd(dir, &block)
@@ -56,6 +63,9 @@ class Hiiro
     @bin = bin
     @original_args = original_args
     @handlers = {}
+    # @handlers = {
+    #   DEFAULT: default_block,
+    # }.transform_keys(&:to_s)
   end
 
   # def pins
@@ -70,6 +80,52 @@ class Hiiro
     success = runnable&.run(*args) || false
 
     exit 1 unless success
+  end
+
+  def pin_file = File.join(Dir.home, 'pins', exact_bin_name)
+
+  def pins
+    return {} unless File.exist?(pin_file)
+
+    @pins || pins!
+  end
+
+  def pins!
+    @pins = File.readlines(pin_file, chomp: true).each_with_object({}) do |line, h|
+      pin, val = line.split(/\s*:\s*/, 2)
+      h[pin] = val
+    end
+  end
+
+  def pin_name(q)
+    pins.keys.find { |name| name.start_with?(q) }
+  end
+
+  def pin(q)
+    name = pin_name(q)
+    puts "PIN NAME: #{name.inspect}"
+
+    return nil unless name
+
+    pins[name].tap do |val|
+      puts "PIN VALUE: #{val.inspect}"
+    end
+  end
+
+  def main_dir(pattern, dir_name='carrot')
+    format(pattern, dir_name: dir_name || 'carrot')
+  end
+
+  def switch_to_tmux_session(session_name)
+    if ENV['TMUX'] || ENV['NVIM']
+      unless system('tmux', 'has-session', '-t', session_name)
+        system('tmux', 'new', '-d', '-A', '-s', session_name)
+      end
+
+      system('tmux', 'switchc', '-t', session_name)
+    else
+      system('tmux', 'new', '-A', '-s', session_name)
+    end
   end
 
   def runnable
