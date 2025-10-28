@@ -1,0 +1,215 @@
+#!/usr/bin/env ruby
+
+require "pry"
+
+class Hiiro
+  def self.init(*args)
+    new($0, *args)
+  end
+
+  attr_reader :bin, :bin_name, :all_args
+  attr_reader :subcmd, :args
+
+  def initialize(bin, *args)
+    @bin = bin
+    @bin_name = File.basename(bin)
+    @all_args = args
+    @subcmd, *@args = args # normally i would never do this
+  end
+
+  def run
+    if runner
+      result = runner.run(*args)
+
+      handle_result(result)
+    else
+      help
+    end
+    
+    exit 1
+  rescue => e
+    puts "ERROR: #{e.message}"
+    puts e.backtrace
+    exit 1
+  end
+
+  def handle_result(result)
+    exit 0 if result.nil? || result
+
+    exit 1
+  end
+
+  def runner
+    @runner ||= runners.runner
+  end
+
+  def runners
+    @runners ||= Runners.new(bin_name, subcmd)
+  end
+
+  def add_subcommand(name, &block)
+    runners.add_subcommand(name, block)
+  end
+  alias add_subcmd add_subcommand
+
+  def full_name
+    runner&.full_name || [bin_name, subcmd].join(?-)
+  end
+
+  def subcommand_names
+    runners.subcommand_names
+  end
+
+  def help
+    puts "ERROR: Subcommand #{subcmd.inspect} not found!"
+    puts
+    puts "Possible subcommands:"
+
+    subcommand_names.each { |n| puts "  #{n}" }
+  end
+
+  class Runners
+    attr_reader :bin_name, :subcmd
+
+    def initialize(bin_name, subcmd)
+      @bin_name = bin_name
+      @subcmd = subcmd
+    end
+
+    def runner
+      matching_bin || matching_subcommand
+    end
+
+    def partial
+      [bin_name, subcmd].join(?-)
+    end
+
+    def subcommand_names
+      [*all_bins, *subcommands].map(&:subcommand_name)
+    end
+
+    def paths
+      @paths ||= ENV['PATH'].split(?:).uniq
+    end
+
+    def bins
+      @bins ||= lambda {
+        pattern = format('{%s}/%s*', paths.join(?,), partial)
+
+        Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
+      }.call
+    end
+
+    def all_bins
+      pattern = format('{%s}/%s-*', paths.join(?,), bin_name)
+
+      Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
+    end
+
+    def subcommands
+      @subcommands ||= []
+    end
+
+    def add_subcommand(name, handler)
+      subcommands << Subcommand.new(bin_name, name, handler)
+    end
+
+    # normally i would call this: bin ...but that's already an attr
+    def matching_bin
+      return exact_bin if exact_bin
+
+      matching_bins.first if matching_bins.count == 1
+    end
+
+    def exact_bin
+      @exact_bin ||= bins.find { |b| b.exact_match?(partial) }
+    end
+
+    def matching_bins
+      @matching_bins ||= bins.select { |b| b.match?(partial) }
+    end
+
+    # normally i would call this: subcommand ...but that's already an attr
+    # the reason is: i want the simplest/most direct word to be the thing i really want
+    # i want want the matched subcommand to be: #best_matching_subcommand
+    def matching_subcommand
+      return exact_subcommand if exact_subcommand
+
+      return matching_subcommands.first if matching_subcommands.count == 1
+    end
+
+    def exact_subcommand
+      @exact_subcommand ||= subcommands.find { |b| b.exact_match?(subcmd) }
+    end
+
+    def matching_subcommands
+      @matching_subcommands ||= subcommands.select { |b| b.match?(subcmd) }
+    end
+
+    class Bin
+      attr_reader :bin_name, :path, :name
+      alias full_name name
+
+      def initialize(bin_name, path)
+        @bin_name = bin_name
+        @path = path
+        @name = File.basename(path)
+      end
+
+      def run(*args)
+        system(path, *args)
+      end
+
+      def exact_match?(partial)
+        name == partial
+      end
+
+      def match?(partial)
+        name.start_with?(partial)
+      end
+      
+      def subcommand_name
+        name.sub("#{bin_name}-", '')
+      end
+    end
+
+    class Subcommand
+      attr_reader :bin_name, :name, :handler
+      alias subcommand_name name
+
+      def initialize(bin_name, name, handler)
+        @bin_name = bin_name
+        @name = name.to_s
+        @handler = handler
+      end
+
+      def run(*args)
+        handler.call(*args)
+      end
+
+      def exact_match?(subcmd)
+        name == subcmd.to_s
+      end
+
+      def match?(subcmd)
+        name.start_with?(subcmd.to_s)
+      end
+
+      def full_name
+        [bin_name, name].join(?-)
+      end
+    end
+  end
+end
+
+# only run the runner if being called from the commandline
+if __FILE__ == $0
+  hiiro = Hiiro.init(*ARGV)
+
+  hiiro.add_subcommand(:good) { |*args|
+    puts "inside :good #{args.inspect}"
+  }
+
+  hiiro.run
+end
+
