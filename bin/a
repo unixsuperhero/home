@@ -126,7 +126,15 @@ class Hiiro
     end
 
     def matching_bins
-      @matching_bins ||= bins.select { |b| b.match?(partial) }
+      @matching_bins ||= all_matching_bins.reject { |b|
+        all_matching_bins.any? { |ob|
+          ob != b && b.name.start_with?(ob.name + ?-)
+        }
+      }
+    end
+
+    def all_matching_bins
+      @all_matching_bins ||= bins.select { |b| b.match?(partial) }
     end
 
     # normally i would call this: subcommand ...but that's already an attr
