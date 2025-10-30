@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+if [ $# -gt 0 ]
+then
+  git add --all "$@"
+else
+  git add --all $(git status -s | sed 's/.*[[:space:]]//')
+fi
+
+git status -s
+

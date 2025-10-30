@@ -1,0 +1,5 @@
+#!/bin/bash
+
+
+git log -1 "$@" | head -1 | rg -o '[a-f0-9]{40}' | cat -
+
