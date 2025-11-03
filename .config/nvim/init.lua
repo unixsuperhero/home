@@ -327,6 +327,7 @@ vim.keymap.set('n', ';q', vim.diagnostic.setloclist, { desc = 'Open diagnostics 
 
 -- escape leaves terminal mode
 vim.keymap.set('t', '<esc>', '<c-\\><c-n>')
+vim.keymap.set('t', '<c-[>', '<c-\\><c-n>')
 
 -- my keymaps
 vim.keymap.set('n', '<leader>w', ':w<cr>')
