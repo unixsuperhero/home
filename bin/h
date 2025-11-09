@@ -81,7 +81,7 @@ class Hiiro
   end
 
   def load_plugin(plugin_const)
-    return if loaded_plugins.include?(plugin_const)
+    return if @loaded_plugins.include?(plugin_const)
 
     log "Loading plugin #{plugin_const}"
     plugin_const.load(self)
@@ -145,7 +145,7 @@ class Hiiro
     end
 
     def bins
-      @bins ||= lambda {
+      lambda {
         pattern = format('{%s}/%s*', paths.join(?,), partial)
 
         Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
@@ -174,11 +174,11 @@ class Hiiro
     end
 
     def exact_bin
-      @exact_bin ||= bins.find { |b| b.exact_match?(partial) }
+      bins.find { |b| b.exact_match?(partial) }
     end
 
     def matching_bins
-      @matching_bins ||= all_matching_bins.reject { |b|
+      all_matching_bins.reject { |b|
         all_matching_bins.any? { |ob|
           ob != b && b.name.start_with?(ob.name + ?-)
         }
@@ -186,7 +186,7 @@ class Hiiro
     end
 
     def all_matching_bins
-      @all_matching_bins ||= bins.select { |b| b.match?(partial) }
+      bins.select { |b| b.match?(partial) }
     end
 
     # normally i would call this: subcommand ...but that's already an attr
@@ -202,11 +202,11 @@ class Hiiro
     end
 
     def exact_subcommand
-      @exact_subcommand ||= subcommands.find { |b| b.exact_match?(subcmd) }
+      subcommands.find { |b| b.exact_match?(subcmd) }
     end
 
     def matching_subcommands
-      @matching_subcommands ||= subcommands.select { |b| b.match?(subcmd) }
+      subcommands.select { |b| b.match?(subcmd) }
     end
 
     # if i wanted to reduce the lines of code, i could combine Bin/Subcommand
