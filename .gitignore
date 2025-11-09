@@ -56,7 +56,6 @@ bin/alert
 bin/blanklines
 bin/reset_dbs
 bin/rm_pg_pid
-hiiro/
 proj/
 ruby/
 sftp-dest/

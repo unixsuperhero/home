@@ -5,8 +5,10 @@ require "fileutils"
 require "yaml"
 
 class Hiiro
-  def self.init(*args, &block)
+  def self.init(*args, plugins: [], &block)
     new($0, *args).tap do |hiiro|
+      hiiro.load_plugins(*plugins)
+
       hiiro.add_subcmd(:pin) do |*args|
         case args
         in [] then hiiro.pins.pins.each {|k,v| puts "#{k} => #{v.inspect}" }
@@ -23,6 +25,12 @@ class Hiiro
       end
 
       block.call(hiiro) if block
+    end
+  end
+
+  def self.load_env
+    Config.plugin_files.each do |plugin_file|
+      require plugin_file
     end
   end
 
@@ -52,10 +60,13 @@ class Hiiro
     exit 1
   end
 
-  def config_dir
-    File.join(Dir.home, '.config/hiiro').tap do |config_path|
-      FileUtils.mkdir_p(config_path) unless Dir.exist?(config_path)
-    end
+  def load_plugins(*plugins)
+    plugins.flatten.each { |plugin| load_plugin(plugin) }
+  end
+
+  def load_plugin(plugin_const)
+    log "Loading plugin #{plugin_const}"
+    plugin_const.load(self)
   end
 
   def pins = @pins ||= Pin.new(self)
@@ -95,6 +106,28 @@ class Hiiro
     subcommand_names.each { |n| puts "  #{n}" }
 
     binding.pry
+  end
+
+  def log(message)
+    puts "[Hiiro: #{bin_name} #{(runner&.subcommand_name || subcmd).inspect}]: #{message}"
+  end
+
+  class Config
+    class << self
+      def plugin_files
+        Dir.glob(File.join(plugin_dir, '*'))
+      end
+
+      def plugin_dir
+        config_dir('plugins')
+      end
+
+      def config_dir(subdir=nil)
+        File.join(Dir.home, '.config/hiiro', *[subdir].compact).tap do |config_path|
+          FileUtils.mkdir_p(config_path) unless Dir.exist?(config_path)
+        end
+      end
+    end
   end
 
   class Runners
@@ -296,7 +329,7 @@ class Hiiro
     end
 
     def pin_filename = hiiro.bin_name
-    def pin_dir = File.join(hiiro.config_dir, 'pins').tap {|dir| FileUtils.mkdir_p(dir) }
+    def pin_dir = Config.config_dir('pins').tap {|dir| FileUtils.mkdir_p(dir) }
     def pin_file = File.join(pin_dir, pin_filename)
     def pins
       return @pins if @pins
@@ -321,9 +354,17 @@ class Hiiro
   end
 end
 
+Hiiro.load_env
+
 # only run the runner if being called from the commandline
 if __FILE__ == $0
   hiiro = Hiiro.init(*ARGV)
+
+  hiiro.load_plugin(Tmux)
+
+  hiiro.add_subcommand(:cd) { |project_name='home', *args|
+    hiiro.start_tmux_session('test')
+  }
 
   hiiro.add_subcommand(:good) { |*args|
     puts "inside :good #{args.inspect}"
