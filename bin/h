@@ -54,11 +54,11 @@ class Hiiro
   end
 
   def runner
-    runners.runner
+    @runner ||= runners.runner
   end
 
   def runners
-    Runners.new(bin_name, subcmd)
+    @runners ||= Runners.new(bin_name, subcmd)
   end
 
   def add_subcommand(name, &block)
@@ -145,9 +145,11 @@ class Hiiro
     end
 
     def bins
-      pattern = format('{%s}/%s*', paths.join(?,), partial)
+      @bins ||= lambda {
+        pattern = format('{%s}/%s*', paths.join(?,), partial)
 
-      Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
+        Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
+      }.call
     end
 
     def all_bins
@@ -172,11 +174,11 @@ class Hiiro
     end
 
     def exact_bin
-      bins.find { |b| b.exact_match?(partial) }
+      @exact_bin ||= bins.find { |b| b.exact_match?(partial) }
     end
 
     def matching_bins
-      all_matching_bins.reject { |b|
+      @matching_bins ||= all_matching_bins.reject { |b|
         all_matching_bins.any? { |ob|
           ob != b && b.name.start_with?(ob.name + ?-)
         }
@@ -184,7 +186,7 @@ class Hiiro
     end
 
     def all_matching_bins
-      bins.select { |b| b.match?(partial) }
+      @all_matching_bins ||= bins.select { |b| b.match?(partial) }
     end
 
     # normally i would call this: subcommand ...but that's already an attr
@@ -200,11 +202,11 @@ class Hiiro
     end
 
     def exact_subcommand
-      subcommands.find { |b| b.exact_match?(subcmd) }
+      @exact_subcommand ||= subcommands.find { |b| b.exact_match?(subcmd) }
     end
 
     def matching_subcommands
-      subcommands.select { |b| b.match?(subcmd) }
+      @matching_subcommands ||= subcommands.select { |b| b.match?(subcmd) }
     end
 
     # if i wanted to reduce the lines of code, i could combine Bin/Subcommand
@@ -271,7 +273,7 @@ Hiiro.load_env
 
 # only run the runner if being called from the commandline
 if __FILE__ == $0
-  hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Pins, Project])
+  hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Pins])
 
   hiiro.add_subcommand(:good) { |*args|
     puts "inside :good #{args.inspect}"
