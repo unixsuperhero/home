@@ -9,21 +9,6 @@ class Hiiro
     new($0, *args).tap do |hiiro|
       hiiro.load_plugins(*plugins)
 
-      hiiro.add_subcmd(:pin) do |*args|
-        case args
-        in [] then hiiro.pins.pins.each {|k,v| puts "#{k} => #{v.inspect}" }
-        in ['all'] then hiiro.pins.pins.each {|k,v| puts "#{k} => #{v.inspect}" }
-        in ['get', name] then puts hiiro.pins.get(name)
-        in [name] then puts hiiro.pins.get(name)
-        in ['rm', name] then puts hiiro.pins.remove_and_save(name)
-        in ['remove', name] then puts hiiro.pins.remove_and_save(name)
-        in ['set', name, value] then hiiro.pins.set_and_save(name, value)
-        in [name, value] then hiiro.pins.set_and_save(name, value)
-        else
-          puts "No matching pin subcommand for #{args.inspect}"
-        end
-      end
-
       block.call(hiiro) if block
     end
   end
@@ -36,12 +21,14 @@ class Hiiro
 
   attr_reader :bin, :bin_name, :all_args
   attr_reader :subcmd, :args
+  attr_reader :loaded_plugins
 
   def initialize(bin, *args)
     @bin = bin
     @bin_name = File.basename(bin)
     @all_args = args
     @subcmd, *@args = args # normally i would never do this
+    @loaded_plugins = []
   end
 
   def run
@@ -59,17 +46,6 @@ class Hiiro
     puts e.backtrace
     exit 1
   end
-
-  def load_plugins(*plugins)
-    plugins.flatten.each { |plugin| load_plugin(plugin) }
-  end
-
-  def load_plugin(plugin_const)
-    log "Loading plugin #{plugin_const}"
-    plugin_const.load(self)
-  end
-
-  def pins = @pins ||= Pin.new(self)
 
   def handle_result(result)
     exit 0 if result.nil? || result
@@ -96,6 +72,20 @@ class Hiiro
 
   def subcommand_names
     runners.subcommand_names
+  end
+
+  def pins = @pins ||= Pin.new(self)
+
+  def load_plugins(*plugins)
+    plugins.flatten.each { |plugin| load_plugin(plugin) }
+  end
+
+  def load_plugin(plugin_const)
+    return if loaded_plugins.include?(plugin_const)
+
+    log "Loading plugin #{plugin_const}"
+    plugin_const.load(self)
+    @loaded_plugins.push(plugin_const)
   end
 
   def help
@@ -277,94 +267,13 @@ class Hiiro
       end
     end
   end
-
-  class Pin
-    attr_reader :hiiro
-
-    def initialize(hiiro) = @hiiro = hiiro
-
-    def get(name)
-      pins[find(name)]
-    end
-
-    def set(name, value)
-      pins[name.to_s] = value
-    end
-
-    def set_and_save(name, value)
-      set(name, value)
-      save_pins
-      value
-    end
-
-    def find(partial)
-      pins.keys.map(&:to_s).find do |pin_name|
-        pin_name.start_with?(partial)
-      end
-    end
-
-    def find_all(partial)
-      pins.keys.map(&:to_s).select do |pin_name|
-        pin_name.start_with?(partial)
-      end
-    end
-
-    def remove(name)
-      all_matches = find_all(name)
-
-      if all_matches.count > 1
-        puts "Unable to remove pin.  Multiple matches: #{all_matches.inspect}"
-        return
-      end
-
-      pin_name = all_matches.first
-
-      pins.delete(pin_name.to_s)
-    end
-
-    def remove_and_save(name)
-      remove(name)
-      save_pins
-      pins
-    end
-
-    def pin_filename = hiiro.bin_name
-    def pin_dir = Config.config_dir('pins').tap {|dir| FileUtils.mkdir_p(dir) }
-    def pin_file = File.join(pin_dir, pin_filename)
-    def pins
-      return @pins if @pins
-
-      unless File.exist?(pin_file)
-        File.write(pin_file, YAML.dump({}, stringify_names: true))
-      end
-
-      @pins = YAML.safe_load_file(pin_file)
-    end
-
-    def save_pins(pins = nil)
-      pins = pins || @pins || {}
-
-      File.write(pin_file, YAML.dump(pins, stringify_names: true))
-    end
-
-    def pins!
-      @pins = nil
-      pins
-    end
-  end
 end
 
 Hiiro.load_env
 
 # only run the runner if being called from the commandline
 if __FILE__ == $0
-  hiiro = Hiiro.init(*ARGV)
-
-  hiiro.load_plugin(Tmux)
-
-  hiiro.add_subcommand(:cd) { |project_name='home', *args|
-    hiiro.start_tmux_session('test')
-  }
+  hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Pins])
 
   hiiro.add_subcommand(:good) { |*args|
     puts "inside :good #{args.inspect}"
