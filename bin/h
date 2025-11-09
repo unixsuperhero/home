@@ -273,7 +273,7 @@ Hiiro.load_env
 
 # only run the runner if being called from the commandline
 if __FILE__ == $0
-  hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Pins])
+  hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Pins, Project])
 
   hiiro.add_subcommand(:good) { |*args|
     puts "inside :good #{args.inspect}"

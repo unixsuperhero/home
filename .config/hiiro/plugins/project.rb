@@ -10,47 +10,45 @@ module Project
   end
 
   def self.add_subcommands(hiiro)
-    hiiro.instance_eval do
-      add_subcmd(:project) do |project_name|
-        re = /#{project_name}/i
+    hiiro.add_subcmd(:project) do |project_name|
+      re = /#{project_name}/i
 
-        matches = project_dirs.select{|proj, path| proj.match?(re) }
+      matches = hiiro.project_dirs.select{|proj, path| proj.match?(re) }
 
-        puts matches_one: matches
-        if matches.count > 1
-          matches = matches.select{|name, path| name == project_name }
+      puts matches_one: matches
+      if matches.count > 1
+        matches = matches.select{|name, path| name == project_name }
+      end
+
+      puts matches_two: matches
+      case matches.count
+      when 0
+        name = 'proj'
+        path = File.join(Dir.home, 'proj')
+
+        unless Dir.exist?(path)
+          puts "Error: #{path.inspect} does not exist"
+          exit 1
         end
 
-        puts matches_two: matches
-        case matches.count
-        when 0
-          name = 'proj'
-          path = File.join(Dir.home, 'proj')
+        puts "changing dir: #{path}"
+        Dir.chdir(path)
 
-          unless Dir.exist?(path)
-            puts "Error: #{path.inspect} does not exist"
-            exit 1
-          end
+        hiiro.start_tmux_session(name)
+      when 1
+        name, path = matches.first
 
-          puts "changing dir: #{path}"
-          Dir.chdir(path)
+        puts "changing dir: #{path}"
+        Dir.chdir(path)
 
-          start_tmux_session(name)
-        when 1
-          name, path = matches.first
-
-          puts "changing dir: #{path}"
-          Dir.chdir(path)
-
-          start_tmux_session(name)
-        when (2..)
-          puts "ERROR: Multiple matches found"
-          puts
-          puts "Matches:"
-          matches.each { |name, path|
-            puts format("  %s: %s", name, path)
-          }
-        end
+        hiiro.start_tmux_session(name)
+      when (2..)
+        puts "ERROR: Multiple matches found"
+        puts
+        puts "Matches:"
+        matches.each { |name, path|
+          puts format("  %s: %s", name, path)
+        }
       end
     end
   end
