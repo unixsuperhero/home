@@ -20,12 +20,18 @@ module Tmux
 
       case matches.count
       when 0
-        puts "ERROR: No matches found"
-        puts
-        puts "Projects:"
-        project_dirs.each { |name, path|
-          puts format("  %s: %s", name, path)
-        }
+        name = 'proj'
+        path = File.join(Dir.home, 'proj')
+
+        unless Dir.exist?(path)
+          puts "Error: #{path.inspect} does not exist"
+          exit 1
+        end
+
+        puts "changing dir: #{path}"
+        Dir.chdir(path)
+
+        start_tmux_session(name)
       when 1
         name, path = matches.first
 
