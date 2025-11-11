@@ -9,6 +9,10 @@ class Hiiro
     new($0, *args).tap do |hiiro|
       hiiro.load_plugins(*plugins)
 
+      hiiro.add_subcmd(:edit) { |*args|
+        system(ENV['EDITOR'] || 'nvim', hiiro.bin)
+      }
+
       block.call(hiiro) if block
     end
   end
@@ -32,6 +36,8 @@ class Hiiro
   end
 
   def run
+    return if @all_args.count == 0
+
     if runner
       result = runner.run(*args)
 
@@ -136,7 +142,7 @@ class Hiiro
     end
 
     def subcommand_names
-      [*all_bins, *subcommands].map(&:subcommand_name)
+      [*all_bins, *subcommands.values].map(&:subcommand_name)
     end
 
     def paths
@@ -189,6 +195,7 @@ class Hiiro
     # i actually might change @subcommand to something like @partial_subcommand
     # so that i can rename this to subcommand
     def matching_subcommand
+      return if subcmd.nil?
       return exact_subcommand if exact_subcommand
 
       if matching_subcommands.count > 1
@@ -200,11 +207,11 @@ class Hiiro
     end
 
     def exact_subcommand
-      subcommands.find { |k,v| v.exact_match?(subcmd) }
+      subcommands.values.find { |v| v.exact_match?(subcmd) }
     end
 
     def matching_subcommands
-      subcommands.select { |k,v| v.match?(subcmd) }.values
+      subcommands.values.select { |v| v.match?(subcmd) }
     end
 
     # if i wanted to reduce the lines of code, i could combine Bin/Subcommand
