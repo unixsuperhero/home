@@ -54,11 +54,11 @@ class Hiiro
   end
 
   def runner
-    @runner ||= runners.runner
+    runners.runner
   end
 
   def runners
-    @runners ||= Runners.new(bin_name, subcmd)
+    @runners ||= Runners.new(self)
   end
 
   def add_subcommand(name, &block)
@@ -83,19 +83,16 @@ class Hiiro
   def load_plugin(plugin_const)
     return if @loaded_plugins.include?(plugin_const)
 
-    log "Loading plugin #{plugin_const}"
     plugin_const.load(self)
     @loaded_plugins.push(plugin_const)
   end
 
   def help
-    puts "Subcommand #{subcmd.inspect} not found!"
-    puts
-    puts "Possible subcommands:"
+    log "Subcommand #{subcmd.inspect} not found!"
+    log ""
+    log "Possible subcommands:"
 
-    subcommand_names.each { |n| puts "  #{n}" }
-
-    binding.pry
+    subcommand_names.each { |n| log "  #{n}" }
   end
 
   def log(message)
@@ -121,11 +118,13 @@ class Hiiro
   end
 
   class Runners
-    attr_reader :bin_name, :subcmd
+    attr_reader :hiiro, :bin_name, :subcmd, :subcommands
 
-    def initialize(bin_name, subcmd)
-      @bin_name = bin_name
-      @subcmd = subcmd
+    def initialize(hiiro)
+      @hiiro = hiiro
+      @bin_name = hiiro.bin_name
+      @subcmd = hiiro.subcmd
+      @subcommands = {}
     end
 
     def runner
@@ -145,11 +144,9 @@ class Hiiro
     end
 
     def bins
-      lambda {
-        pattern = format('{%s}/%s*', paths.join(?,), partial)
+      pattern = format('{%s}/%s*', paths.join(?,), partial)
 
-        Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
-      }.call
+      Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
     end
 
     def all_bins
@@ -158,12 +155,8 @@ class Hiiro
       Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
     end
 
-    def subcommands
-      @subcommands ||= []
-    end
-
     def add_subcommand(name, handler)
-      subcommands << Subcommand.new(bin_name, name, handler)
+      @subcommands[name] = Subcommand.new(bin_name, name, handler)
     end
 
     # normally i would call this: bin ...but that's already an attr
@@ -198,15 +191,20 @@ class Hiiro
     def matching_subcommand
       return exact_subcommand if exact_subcommand
 
-      return matching_subcommands.first if matching_subcommands.count == 1
+      if matching_subcommands.count > 1
+        hiiro.log("Multiple matching subcommands:")
+        matching_subcommands.each { |m| hiiro.log("  #{m.name}") }
+      end
+
+      return matching_subcommands.first
     end
 
     def exact_subcommand
-      subcommands.find { |b| b.exact_match?(subcmd) }
+      subcommands.find { |k,v| v.exact_match?(subcmd) }
     end
 
     def matching_subcommands
-      subcommands.select { |b| b.match?(subcmd) }
+      subcommands.select { |k,v| v.match?(subcmd) }.values
     end
 
     # if i wanted to reduce the lines of code, i could combine Bin/Subcommand
