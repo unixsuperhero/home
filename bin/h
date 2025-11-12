@@ -5,8 +5,8 @@ require "fileutils"
 require "yaml"
 
 class Hiiro
-  def self.init(*args, plugins: [], &block)
-    new($0, *args).tap do |hiiro|
+  def self.init(*args, plugins: [], logging: false, &block)
+    new($0, *args, logging: logging).tap do |hiiro|
       hiiro.load_plugins(*plugins)
 
       hiiro.add_subcmd(:edit) { |*args|
@@ -26,13 +26,15 @@ class Hiiro
   attr_reader :bin, :bin_name, :all_args
   attr_reader :subcmd, :args
   attr_reader :loaded_plugins
+  attr_reader :logging
 
-  def initialize(bin, *args)
+  def initialize(bin, *args, logging: false)
     @bin = bin
     @bin_name = File.basename(bin)
     @all_args = args
     @subcmd, *@args = args # normally i would never do this
     @loaded_plugins = []
+    @logging = logging
   end
 
   def run
@@ -102,6 +104,8 @@ class Hiiro
   end
 
   def log(message)
+    return unless logging
+
     puts "[Hiiro: #{bin_name} #{(runner&.subcommand_name || subcmd).inspect}]: #{message}"
   end
 
