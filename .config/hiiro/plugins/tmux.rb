@@ -5,15 +5,6 @@ module Tmux
     hiiro.log "Plugin loaded: #{name}"
 
     attach_methods(hiiro)
-    add_subcommands(hiiro)
-  end
-
-  def self.add_subcommands(hiiro)
-    hiiro.instance_eval do
-      add_subcmd(:session) do |session_name|
-        start_tmux_session(session_name)
-      end
-    end
   end
 
   def self.attach_methods(hiiro)
