@@ -13,9 +13,11 @@ module Project
     hiiro.add_subcmd(:project) do |project_name|
       re = /#{project_name}/i
 
-      matches = hiiro.project_dirs.select{|proj, path| proj.match?(re) }
+      conf_matches = hiiro.projects_from_config.select{|k,v| k.match?(re) }
+      dir_matches = hiiro.project_dirs.select{|proj, path| proj.match?(re) }
 
-      puts matches_one: matches
+      puts(conf_matches:,dir_matches:)
+      matches = dir_matches.merge(conf_matches)
       if matches.count > 1
         matches = matches.select{|name, path| name == project_name }
       end
@@ -59,6 +61,14 @@ module Project
         Dir.glob(File.join(Dir.home, 'proj', '*/')).map { |path|
           [File.basename(path), path]
         }.to_h
+      end
+
+      def projects_from_config
+        projects_file = File.join(Dir.home, '.config/hiiro', 'projects.yml')
+
+        return {} unless File.exist?(projects_file)
+
+        YAML.safe_load_file(projects_file)
       end
     end
   end
