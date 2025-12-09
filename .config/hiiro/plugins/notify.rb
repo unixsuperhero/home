@@ -10,17 +10,18 @@ module Notify
   end
 
   def self.add_subcommands(hiiro)
-    hiiro.add_subcmd(:notify) do |message, link=nil, title=nil|
-      hiiro.notify(message, title:, link:)
+    hiiro.add_subcmd(:notify) do |message, link=nil, title=nil, command=nil|
+      hiiro.notify(message, title:, link:, command:)
     end
   end
 
   def self.attach_methods(hiiro)
     hiiro.instance_eval do
-      def notify(message, title: nil, link: nil)
+      def notify(message, title: nil, link: nil, command: nil)
         args = ['terminal-notifier', '-message', message]
         args += ['-title', title] if title
         args += ['-open', link] if link
+        args += ['-execute', command] if command
 
         system(*args) if system('which', 'terminal-notifier')
       end
