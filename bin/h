@@ -5,12 +5,24 @@ require "fileutils"
 require "yaml"
 
 class Hiiro
-  def self.init(*args, plugins: [], logging: false, &block)
-    new($0, *args, logging: logging).tap do |hiiro|
+  def self.init(*args, plugins: [], logging: false, **values, &block)
+    new($0, *args, logging: logging, **values).tap do |hiiro|
       hiiro.load_plugins(*plugins)
 
-      hiiro.add_subcmd(:edit) { |*args|
+      hiiro.add_subcmd(:edit, **values) { |*args|
         system(ENV['EDITOR'] || 'nvim', hiiro.bin)
+      }
+
+      hiiro.add_subcmd(:ppath) { |*args, **v|
+        print File.join(`git rev-parse --show-toplevel`.strip, v[:rdir])
+      }
+
+      hiiro.add_subcmd(:rpath) { |*args, **v|
+        print v[:rdir]
+      }
+
+      hiiro.add_subcmd(:path) { |*args, **v|
+        print v[:dir]
       }
 
       block.call(hiiro) if block
@@ -27,26 +39,22 @@ class Hiiro
   attr_reader :subcmd, :args
   attr_reader :loaded_plugins
   attr_reader :logging
+  attr_reader :global_values
 
-  def initialize(bin, *args, logging: false)
+  def initialize(bin, *args, logging: false, **values)
     @bin = bin
     @bin_name = File.basename(bin)
     @all_args = args
     @subcmd, *@args = args # normally i would never do this
     @loaded_plugins = []
     @logging = logging
+    @global_values = values
   end
 
   def run
-    return if @all_args.count == 0
+    result = runner.run(*args)
 
-    if runner
-      result = runner.run(*args)
-
-      handle_result(result)
-    else
-      help
-    end
+    handle_result(result)
     
     exit 1
   rescue => e
@@ -61,16 +69,24 @@ class Hiiro
     exit 1
   end
 
+  def runnable?
+    runner
+  end
+
   def runner
-    runners.runner
+    runners.runner || runners.default_subcommand
   end
 
   def runners
     @runners ||= Runners.new(self)
   end
 
-  def add_subcommand(name, &block)
-    runners.add_subcommand(name, block)
+  def add_default(**values, &handler)
+    runners.add_subcommand(:DEFAULT, handler, **global_values, **values)
+  end
+
+  def add_subcommand(name, **values, &handler)
+    runners.add_subcommand(name, handler, **global_values, **values)
   end
   alias add_subcmd add_subcommand
 
@@ -96,17 +112,24 @@ class Hiiro
   end
 
   def help
-    log "Subcommand #{subcmd.inspect} not found!"
-    log ""
-    log "Possible subcommands:"
+    subcmd_msg = "Subcommand required!"
+    subcmd_msg = "Subcommand #{subcmd.inspect} not found!" if subcmd
 
-    subcommand_names.each { |n| log "  #{n}" }
+    puts subcmd_msg
+    puts ""
+    puts "Possible subcommands:"
+
+    subcommand_names.reverse.each { |n| puts "  #{n}" }
   end
 
   def log(message)
     return unless logging
 
     puts "[Hiiro: #{bin_name} #{(runner&.subcommand_name || subcmd).inspect}]: #{message}"
+  end
+
+  def parsed_args
+    i = Args.new(*args)
   end
 
   class Config
@@ -138,7 +161,13 @@ class Hiiro
     end
 
     def runner
+      return default_subcommand if subcmd.to_s == ''
+
       matching_bin || matching_subcommand
+    end
+
+    def default_subcommand
+      Subcommand.new(bin_name, :default, lambda { hiiro.help; false })
     end
 
     def partial
@@ -165,8 +194,8 @@ class Hiiro
       Dir.glob(pattern).map { |path| Bin.new(bin_name, path) }
     end
 
-    def add_subcommand(name, handler)
-      @subcommands[name] = Subcommand.new(bin_name, name, handler)
+    def add_subcommand(name, handler, **values)
+      @subcommands[name] = Subcommand.new(bin_name, name, handler, values)
     end
 
     # normally i would call this: bin ...but that's already an attr
@@ -250,17 +279,18 @@ class Hiiro
     end
 
     class Subcommand
-      attr_reader :bin_name, :name, :handler
+      attr_reader :bin_name, :name, :handler, :values
       alias subcommand_name name
 
-      def initialize(bin_name, name, handler)
+      def initialize(bin_name, name, handler, values={})
         @bin_name = bin_name
         @name = name.to_s
         @handler = handler
+        @values = values || {}
       end
 
       def run(*args)
-        handler.call(*args)
+        handler.call(*args, **values)
       end
 
       def exact_match?(subcmd)
@@ -276,16 +306,64 @@ class Hiiro
       end
     end
   end
+
+  class Args
+    attr_reader :raw_args
+
+    def initialize(*raw_args)
+      @raw_args = raw_args
+    end
+
+    def flags
+      @flags ||= proc {
+        raw_args.select { |arg|
+          arg.match?(/^-[^-]/)
+        }.flat_map { |arg|
+          arg.sub(/^-/, '').chars
+        }
+      }.call
+    end
+
+    def flag?(flag)
+      flags.include?(flag)
+    end
+
+    def flag_value(flag)
+      found_flag = false
+      raw_args.each do |arg|
+        if found_flag
+          return arg
+        end
+
+        if arg.match?(/^-\w*#{flag}/)
+          found_flag = true
+        end
+      end
+
+      nil
+    end
+
+    def values
+      raw_args.reject do |arg|
+        arg.match?(/^-/)
+      end
+    end
+  end
 end
 
 Hiiro.load_env
 
+
 # only run the runner if being called from the commandline
 if __FILE__ == $0
-  hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Pins, Project, Task])
+  hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Pins, Project, Task], cwd: Dir.pwd)
 
   hiiro.add_subcommand(:good) { |*args|
     puts "inside :good #{args.inspect}"
+  }
+
+  hiiro.add_subcommand(:test) { |*args, **v|
+    puts 'test successful'
   }
 
   hiiro.run
