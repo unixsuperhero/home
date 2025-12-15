@@ -10,7 +10,7 @@ module Task
   end
 
   def self.add_subcommands(hiiro)
-    hiiro.add_subcmd(:task) do |*args|
+    hiiro.add_subcmd(:task) do |*args, **v|
       tasks = hiiro.task_manager
 
       case args
