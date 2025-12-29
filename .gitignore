@@ -88,3 +88,7 @@ backup.notes/
 notes.old/
 .aspnet
 .config/yt-dlp/
+.python_history
+.matplotlib/
+.modelscope/
+.claude.json

@@ -91,6 +91,10 @@ alias ezs="vim ~/.zshrc"
 alias .zs="source ~/.zshrc"
 
 alias rg="rg -S"
+alias ls="ls -1"
+alias ll="ls -l"
+alias lsr="ls -1tr"
+alias llr="ls -ltr"
 
 function gss() {
   if test $# -gt 0; then
@@ -122,14 +126,6 @@ function pad() {
 
 export PS1=$'\n'"%~ \$(git_prompt_info)"$'\n'"%#> "
 
-alias wo="timer 30m && terminal-notifier -message 'Pomodoro'\
-        -title 'Work Timer is up! Take a Break 😊'\
-        -sound Crystal"
-
-alias br="timer 10m && terminal-notifier -message 'Pomodoro'\
-        -title 'Break is over! Get back to work 😬'\
-        -sound Crystal"
-
 export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
 source <(starship init zsh --print-full-init)
 
@@ -139,3 +135,5 @@ export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
 [[ -n $SSH_CONNECTION && -z $VIM && -z $TMUX ]] && tmux new -A -s remote
 
 export TERM=screen-256color
+
+source /Users/unixsuperhero/.config/broot/launcher/bash/br

@@ -1,2 +1,5 @@
 **/.claude/**/*
 **/prompts/**/*
+**/tmp/**/*
+
+**/.claude/settings.local.json

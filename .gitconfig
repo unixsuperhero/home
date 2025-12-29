@@ -7,7 +7,7 @@ email = jearsh+github@gmail.com
 [core]
   whitespace = trailing-space,tab-in-indent,cr-at-eol,blank-at-eol,blank-at-eof
   fsmonitor = true
-  excludesFile = /Users/josh/.config/git/ignore
+  excludesFile = ~/.config/git/ignore
 [diff]
   algorithm = histogram
   colorMoved = plain

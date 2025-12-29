@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "MSG=$(cat | jq -r '.message // \"Needs input\"'); terminal-notifier -title 'Claude Code' -message \"$MSG\" -sound default -execute \"echo switchc -t '$TMUX_PANE' | pbcopy\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "terminal-notifier -title 'Claude Code' -message 'Work completed' -sound Hero -execute \"echo switchc -t '$TMUX_PANE' | pbcopy\""
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "taches-cc-resources@taches-cc-resources": true
+  },
+  "alwaysThinkingEnabled": true
+}
