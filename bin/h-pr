@@ -2,7 +2,7 @@
 
 require 'json'
 
-require File.join(Dir.home, 'bin', 'h-base.rb')
+load File.join(Dir.home, 'bin', 'h')
 require File.join(Dir.home, 'bin', 'pr.rb')
 
 o = Hiiro.init(*ARGV)

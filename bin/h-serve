@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require '/Users/unixsuperhero/bin/h-base.rb'
+load File.join(Dir.home, 'bin', 'h')
 
 system('miniserve', '-p', '1111')
 

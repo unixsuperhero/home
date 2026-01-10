@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require '/Users/unixsuperhero/bin/h-base.rb'
+load File.join(Dir.home, 'bin', 'h')
 
 o = Hiiro.init(*ARGV)
 o.add_subcmd(:vids) { |outfile, *args|
