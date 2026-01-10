@@ -1,7 +1,22 @@
 #!/usr/bin/env ruby
-require '/Users/unixsuperhero/bin/h-base.rb'
+load '/Users/unixsuperhero/bin/h'
 
 o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:other_resize) { |infile, scale, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  scale ||= '720'
+  outfile ||= proc {
+    temp_name = infile.dup || ''
+    ext = File.extname(temp_name)
+    basename = File.basename(temp_name, ext)
+    [basename, :resized, scale + 'p', ext].join('.').gsub(/[.][.]+/, ?.)
+  }.call
+
+  dimensions = ['-2', scale].join(':')
+  scale_arg = [:scale, dimensions].join(?=)
+  system('ffmpeg', '-i', infile, '-vf', scale_arg, outfile)
+}
 
 o.add_subcmd(:resize) { |ofile, scale, nfile|
   raise 'arg error' if [ofile, scale, nfile].compact.count != 3
@@ -16,6 +31,10 @@ o.add_subcmd(:reencode) { |ofile, nfile|
   raise 'arg error' if [ofile, nfile].compact.count != 2
 
   system('ffmpeg', '-i', ofile, nfile)
+}
+
+o.add_subcmd(:info) { |ifile|
+  system('ffprobe', ifile)
 }
 
 if o.runnable?

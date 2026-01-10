@@ -1,0 +1,43 @@
+#!/usr/bin/env ruby
+
+load File.join(Dir.home, 'bin', 'h')
+
+o = Hiiro.init(*ARGV, plugins: [Pins])
+
+o.add_subcmd(:ls) { |*args|
+  system('tmux', 'list-sessions', *args)
+}
+
+o.add_subcmd(:new) { |*args|
+  system('tmux', 'new-session', *args)
+}
+
+o.add_subcmd(:kill) { |*args|
+  system('tmux', 'kill-session', *args)
+}
+
+o.add_subcmd(:attach) { |*args|
+  system('tmux', 'attach-session', *args)
+}
+
+o.add_subcmd(:rename) { |*args|
+  system('tmux', 'rename-session', *args)
+}
+
+o.add_subcmd(:switch) { |*args|
+  system('tmux', 'switch-client', *args)
+}
+
+o.add_subcmd(:detach) { |*args|
+  system('tmux', 'detach-client', *args)
+}
+
+o.add_subcmd(:has) { |*args|
+  system('tmux', 'has-session', *args)
+}
+
+o.add_subcmd(:info) { |*args|
+  system('tmux', 'display-message', '-p', '#{session_name}: #{session_windows} windows, #{session_attached} attached', *args)
+}
+
+o.run

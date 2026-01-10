@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+
+load File.join(Dir.home, 'bin', 'h')
+
+o = Hiiro.init(*ARGV, plugins: [Pins])
+
+o.add_subcmd(:ls) { |*args|
+  system('tmux', 'list-windows', *args)
+}
+
+o.add_subcmd(:lsa) { |*args|
+  system('tmux', 'list-windows', '-a', *args)
+}
+
+o.add_subcmd(:new) { |*args|
+  system('tmux', 'new-window', *args)
+}
+
+o.add_subcmd(:kill) { |*args|
+  system('tmux', 'kill-window', *args)
+}
+
+o.add_subcmd(:rename) { |*args|
+  system('tmux', 'rename-window', *args)
+}
+
+o.add_subcmd(:swap) { |*args|
+  system('tmux', 'swap-window', *args)
+}
+
+o.add_subcmd(:move) { |*args|
+  system('tmux', 'move-window', *args)
+}
+
+o.add_subcmd(:select) { |*args|
+  system('tmux', 'select-window', *args)
+}
+
+o.add_subcmd(:next) { |*args|
+  system('tmux', 'next-window', *args)
+}
+
+o.add_subcmd(:prev) { |*args|
+  system('tmux', 'previous-window', *args)
+}
+
+o.add_subcmd(:last) { |*args|
+  system('tmux', 'last-window', *args)
+}
+
+o.add_subcmd(:link) { |*args|
+  system('tmux', 'link-window', *args)
+}
+
+o.add_subcmd(:unlink) { |*args|
+  system('tmux', 'unlink-window', *args)
+}
+
+o.run

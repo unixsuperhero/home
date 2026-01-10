@@ -1,0 +1,93 @@
+#!/usr/bin/env ruby
+
+load File.join(Dir.home, 'bin/h')
+
+hiiro = Hiiro.init(*ARGV)
+
+SAVED_VOLUME_FILE = File.join(Dir.home, '.no-mic-saved-volume')
+DEFAULT_VOLUME = 75
+
+def get_input_volume
+  `osascript -e 'input volume of (get volume settings)'`.strip.to_i
+end
+
+def set_input_volume(vol)
+  system('osascript', '-e', "set volume input volume #{vol}")
+end
+
+def save_volume(vol)
+  File.write(SAVED_VOLUME_FILE, vol.to_s) if vol > 0
+end
+
+def get_saved_volume
+  if File.exist?(SAVED_VOLUME_FILE)
+    File.read(SAVED_VOLUME_FILE).strip.to_i
+  else
+    DEFAULT_VOLUME
+  end
+end
+
+hiiro.add_subcmd(:set) do |new_volume|
+  old_volume = get_input_volume
+  puts "Microphone muted (was at #{old_volume}%)"
+
+  set_input_volume(new_volume)
+
+  current_volume = get_input_volume
+  puts "Microphone muted (set to #{current_volume}%)"
+end
+
+hiiro.add_subcmd(:mute) do
+  current_volume = get_input_volume
+
+  if current_volume == 0
+    puts "Microphone is already muted"
+  else
+    save_volume(current_volume)
+    set_input_volume(0)
+    puts "Microphone muted (was at #{current_volume}%)"
+  end
+end
+
+hiiro.add_subcmd(:unmute) do
+  current_volume = get_input_volume
+
+  if current_volume > 0
+    puts "Microphone is already unmuted (currently at #{current_volume}%)"
+  else
+    restore_volume = get_saved_volume
+    set_input_volume(restore_volume)
+    puts "Microphone unmuted (restored to #{restore_volume}%)"
+  end
+end
+
+hiiro.add_subcmd(:toggle) do
+  current_volume = get_input_volume
+
+  if current_volume == 0
+    restore_volume = get_saved_volume
+    set_input_volume(restore_volume)
+    puts "Microphone unmuted (restored to #{restore_volume}%)"
+  else
+    save_volume(current_volume)
+    set_input_volume(0)
+    puts "Microphone muted (was at #{current_volume}%)"
+  end
+end
+
+hiiro.add_subcmd(:status) do
+  current_volume = get_input_volume
+
+  if current_volume == 0
+    puts "Microphone: MUTED"
+  else
+    puts "Microphone: ON (volume: #{current_volume}%)"
+  end
+end
+
+hiiro.add_subcmd(:edit) do
+  editor = ENV.fetch('EDITOR', 'nvim')
+  system(editor, __FILE__)
+end
+
+hiiro.run

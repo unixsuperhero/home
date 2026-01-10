@@ -1,0 +1,46 @@
+#!/usr/bin/env ruby
+
+load File.join(Dir.home, 'bin', 'h')
+
+o = Hiiro.init(*ARGV, plugins: [Pins])
+
+o.add_subcmd(:ls) { |*args|
+  system('tmux', 'list-buffers', *args)
+}
+
+o.add_subcmd(:show) { |*args|
+  system('tmux', 'show-buffer', *args)
+}
+
+o.add_subcmd(:save) { |*args|
+  system('tmux', 'save-buffer', *args)
+}
+
+o.add_subcmd(:load) { |*args|
+  system('tmux', 'load-buffer', *args)
+}
+
+o.add_subcmd(:set) { |*args|
+  system('tmux', 'set-buffer', *args)
+}
+
+o.add_subcmd(:paste) { |*args|
+  system('tmux', 'paste-buffer', *args)
+}
+
+o.add_subcmd(:delete) { |*args|
+  system('tmux', 'delete-buffer', *args)
+}
+
+o.add_subcmd(:choose) { |*args|
+  system('tmux', 'choose-buffer', *args)
+}
+
+o.add_subcmd(:clear) { |*args|
+  # Delete all buffers
+  buffers = `tmux list-buffers -F '\#{buffer_name}'`.strip.split("\n")
+  buffers.each { |buf| system('tmux', 'delete-buffer', '-b', buf) }
+  puts "Cleared #{buffers.count} buffers"
+}
+
+o.run

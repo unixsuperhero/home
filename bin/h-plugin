@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+load File.join(Dir.home, 'bin', 'h')
+
+BASE_DIR = File.join(Dir.home, '.config/hiiro/plugins')
+o = Hiiro.init(*ARGV, plugins: [Tmux, Pins], dir: BASE_DIR)
+
+def plugin_files
+  Dir.glob(File.join(BASE_DIR, '**/*'))
+end
+
+o.add_subcmd(:path) { |*args|
+  print o.get_value(:dir)
+}
+
+o.add_subcmd(:ls) { |*args|
+  puts plugin_files
+}
+
+o.add_subcmd(:edit) { |*args|
+  if args.none?
+    system(ENV['EDITOR'] || 'safe_nvim', __FILE__)
+  else
+    plugins = plugin_files.select{|f| args.any?{|arg| File.basename(f).start_with?(arg) } }
+
+    if plugins.none?
+      puts "No matching plugins found for: #{args.map(&:inspect).join(' ')}"
+    else
+      system(ENV['EDITOR'] || 'safe_nvim', *plugins)
+    end
+  end
+}
+
+o.add_subcmd(:rg) { |*args|
+  Dir.chdir(o.get_value(:dir))
+  system('rg', '-S', *args)
+}
+
+o.add_subcmd(:rgall) { |*args|
+  Dir.chdir(o.get_value(:dir))
+  system('rg', '-S', '--no-ignore-vcs', *args)
+}
+
+begin
+  o.run
+rescue => e
+  binding.pry
+end
+
