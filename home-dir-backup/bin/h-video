@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+
+require "json"
+load File.join(Dir.home, 'bin/h')
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:rip_audio) { |infile, outfile|
+  cmd = (%w[ffmpeg -i] << infile) + (%w[-vn -ar 44100 -ac 1] << outfile)
+
+  puts "Command: #{cmd.join(' ')}"
+
+  system(*cmd)
+}
+
+o.add_subcmd(:resize) { |ofile, scale, nfile|
+  raise 'arg error' if [ofile, scale, nfile].compact.count != 3
+
+  puts msg: :inside_video, called: :handler, aka: :subcmd
+
+  scale_arg = [:scale, scale].join(?=)
+  system('ffmpeg', '-i', ofile, '-vf', scale_arg, nfile)
+}
+
+o.add_subcmd(:reencode) { |ofile, nfile|
+  raise 'arg error' if [ofile, nfile].compact.count != 2
+
+  system('ffmpeg', '-i', ofile, nfile)
+}
+
+if o.runnable?
+  o.run
+else
+  puts :no_runnable_found
+end
+

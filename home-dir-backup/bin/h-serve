@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+require '/Users/unixsuperhero/bin/h-base.rb'
+
+system('miniserve', '-p', '1111')
+

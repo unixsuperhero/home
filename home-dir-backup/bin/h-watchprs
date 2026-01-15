@@ -1,0 +1,143 @@
+#!/usr/bin/env ruby
+
+require 'pry'
+require 'json'
+require 'digest'
+require 'optparse'
+
+options = {
+  say_approvals: true,
+  say_status: true,
+  say_passing: true,
+  say_publishing: true,
+  mark_ready: false
+}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: h-watchprs [options]"
+
+  opts.on("-a", "--no-say-approvals", "Disable 'say' for new approvals") do
+    options[:say_approvals] = false
+  end
+
+  opts.on("-s", "--no-say-status", "Disable 'say' for status changes") do
+    options[:say_status] = false
+  end
+
+  opts.on("-p", "--no-say-passing", "Disable 'say' for passing PRs") do
+    options[:say_passing] = false
+  end
+
+  opts.on("-u", "--no-say-publishing", "Disable 'say' when publishing PR as ready") do
+    options[:say_publishing] = false
+  end
+
+  opts.on("-r", "--mark-ready", "Enable marking PR as ready when passing") do
+    options[:mark_ready] = true
+  end
+
+  opts.on("-h", "--help", "Prints this help") do
+    puts opts
+    exit
+  end
+end.parse!
+
+SLEEP_TIME = ENV.fetch('sleep_for', 60)
+prs = {}
+approvals = {}
+first_run = true
+
+last_prs = {}
+last_json_md5 = nil
+
+loop do
+  stdout = `gh pr status`
+
+  md5 = Digest::MD5.hexdigest(stdout)
+
+  if stdout.match?(/something went wrong/i)
+    sleep SLEEP_TIME
+    next
+  end
+
+  collecting = false
+  current_pr = nil
+  new_statuses = {}
+  new_approvals = {}
+  stdout.lines(chomp: true).map do |line|
+    collecting = true if line.match?(/created by you/i)
+    next unless collecting
+
+    if num = line[/[#]\d+/]
+      current_pr = num.sub(?#, '')
+      next
+    end
+
+    if current_pr && line.match?(/checks (pending|passing|failing)/i)
+      new_status = line[/pending|passing|failing/]
+
+      old_approval_count = approvals.fetch(current_pr, 0)
+
+      if line.match?(/✓ (\d\d*) Approved/)
+        partial = line[/✓ (\d\d*) Approved/]
+        approval_count = partial[/\d\d*/]
+        new_approvals[current_pr] = approval_count
+      end
+
+      approvals[current_pr]
+      new_statuses[current_pr] = new_status
+      current_pr = nil
+    end
+
+    break if line.match?(/^\s*$/)
+  end
+
+  status_changed = new_statuses.any?{ |pr,new_status| prs[pr] != new_status }
+  approvals_changed = new_approvals.any?{|pr,new_approval_count| approvals[pr] != new_approval_count }
+  puts(
+    prs:,
+    status_changed:,
+    approvals_changed:,
+  )
+
+  if status_changed || approvals_changed
+    puts
+  end
+
+  new_approvals.each do |current_pr, new_approval|
+    if approvals.has_key?(current_pr)
+      if approvals[current_pr] != new_approval
+        system('say', 'pr', 'has', new_approval, 'approvals') if options[:say_approvals]
+        puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
+      end
+    else
+      system('say', 'pr', 'has', new_approval, 'approvals') if options[:say_approvals]
+      puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
+    end
+  end
+
+  new_statuses.each do |current_pr, new_status|
+    old_status = prs[current_pr]
+    puts(
+      current_pr:,
+      old_status:,
+      new_status:,
+    )
+    if prs.key?(current_pr) && old_status != new_status
+      system('say', 'pr', 'is', new_status) if options[:say_status]
+
+      if new_status[/passing/]
+        system('say', 'publishing pr') if options[:mark_ready] && options[:say_publishing]
+        system('gh', 'pr', 'ready', current_pr) if options[:mark_ready]
+        system('gh', 'pr', 'view', '-w', current_pr)
+      end
+
+      puts format('%7s (%s): https://github.com/instacart/carrot/pull/%s', current_pr, new_status, current_pr)
+    end
+  end
+
+  prs = new_statuses
+  approvals = new_approvals
+
+  sleep SLEEP_TIME
+end

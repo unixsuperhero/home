@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+
+load File.join(Dir.home, 'bin/h')
+
+hiiro = Hiiro.init(*ARGV)
+
+hiiro.add_subcmd(:compare) do |*args|
+  left = File.join(Dir.home, 'proj/home/bin')
+  right = File.join(Dir.home, 'bin')
+  diff = `diff -qrs #{left} #{right}`.lines(chomp: true)
+
+  diff.each do |line|
+    next if line.match?(/[.]DS_Store/)
+
+    case line
+    when /^Only in #{left}:/
+      match = line.match(/^Only in ([^:]+):\s*(\S.*)/)
+      _, fname = match.captures
+      puts "ln -v #{File.join(left, fname).inspect} #{File.join(right, fname).inspect}"
+    when /^Only in #{right}:/
+      match = line.match(/^Only in ([^:]+):\s*(\S.*)/)
+      _, fname = match.captures
+      puts "ln -v #{File.join(right, fname).inspect} #{File.join(left, fname).inspect}"
+    when / differ/
+      match = line.match(/^Files (.*) and (.*) differ/)
+      lname, rname = match.captures
+      puts "vim -d #{lname.inspect} #{rname.inspect}"
+    end
+    puts
+  end
+end
+
+
+hiiro.run
+

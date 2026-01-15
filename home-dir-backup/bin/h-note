@@ -1,0 +1,84 @@
+#!/usr/bin/env ruby
+
+require '/Users/unixsuperhero/bin/h-base.rb'
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:new) { |*args|
+  root_dir = File.join(Dir.home, 'notes')
+
+  unless Dir.exist?(root_dir)
+    Dir.mkdir(root_dir)
+  end
+
+  Directory.temp_cd(root_dir) {
+    system(ENV['EDITOR'] || 'vim', '-O', *args)
+  }
+}
+
+o.add_subcmd(:categories) { |*args|
+  root_dir = File.join(Dir.home, 'notes')
+
+  unless Dir.exist?(root_dir)
+    Dir.mkdir(root_dir)
+  end
+
+  Directory.temp_cd(root_dir) {
+    Directory.dir_tree(root_dir)
+  }
+}
+
+o.add_subcmd(:tagged_files) { |*args|
+  root_dir = File.join(Dir.home, 'notes')
+
+  unless Dir.exist?(root_dir)
+    Dir.mkdir(root_dir)
+  end
+
+  Directory.temp_cd(root_dir) {
+    args.each do |tag|
+      tag = tag.sub(/^#+/, '')
+      tag_pattern = format('#%s\\b', tag)
+      cmd = format('rg -S %s %s', tag_pattern.inspect, root_dir)
+      out, err, status = Open3.capture3(cmd)
+
+      if status.success?
+        puts format('#%s', tag)
+        puts format('#%s', tag).gsub(/./, ?-)
+        out.lines.each do |line|
+          file = line.sub(/:.*/, '')
+          puts Pathname.new(file).relative_path_from(root_dir)
+        end
+      end
+
+      puts
+    end
+  }
+}
+
+o.add_subcmd(:tags) { |*args|
+  root_dir = File.join(Dir.home, 'notes')
+
+  unless Dir.exist?(root_dir)
+    Dir.mkdir(root_dir)
+  end
+
+  Directory.temp_cd(root_dir) {
+    tag_pattern = '#[^#[:space:]]+'
+    cmd = format('rg -SI %s %s', tag_pattern.inspect, root_dir)
+    out, err, status = Open3.capture3(cmd)
+
+    if status.success?
+      puts out.scan(Regexp.new(tag_pattern)).sort.uniq
+    end
+
+    binding.pry
+  }
+}
+
+if o.runnable?
+  o.run
+else
+  puts :no_runnable_found
+end
+

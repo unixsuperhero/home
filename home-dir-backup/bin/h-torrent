@@ -1,0 +1,147 @@
+#!/usr/bin/env ruby
+require '/Users/unixsuperhero/bin/h-base.rb'
+require 'net/http'
+require 'uri'
+require 'nokogiri'
+require 'bencode_ext'
+require 'fileutils'
+require 'pry'
+
+class Feed
+  attr_reader :url
+
+  def initialize(url)
+    @url = url
+  end
+
+  def uri = @uri ||= URI(url)
+  def xml = @xml ||= Nokogiri::XML(rss)
+  def items = @items ||= xml.css('item').map(&Item.method(:new))
+
+  def rss
+    @rss ||= proc {
+      puts format('Fetching feed: %s', uri)
+      Net::HTTP.get(uri)
+    }.call
+  end
+
+  class Item
+    attr_reader :root
+
+    def initialize(root)
+      @root = root
+    end
+
+    def title = root.css('title')&.text
+    def link = root.css('link')&.text
+  end
+end
+
+class Torrent
+  def self.fetch(url)
+    uri = URI(url)
+    data = Net::HTTP.get(uri)
+
+    new(data)
+  end
+
+  attr_reader :encoded_data
+
+  def initialize(encoded_data)
+    @encoded_data = encoded_data
+  end
+
+  def data = @data ||= encoded_data.bdecode
+  def info = @info ||= data['info']
+  def files = @files ||= info['files']
+  def file_count = @file_count ||= files.count || 1
+  def file_names = @file_names ||= files&.flat_map{|f| f['path'] } || [info['name']]
+  def videos = @videos ||= file_names.select{|name| Filetype.video?(name) }
+end
+
+class History
+  ROOT_PATH = File.join(Dir.home, '.local', 'share', 'h-torrent')
+
+  def root_path = ROOT_PATH.tap { |p| FileUtils.mkdir_p(p) }
+  def history_path = File.join(root_path, 'history')
+
+  def history!
+    @history = File.readlines(history_path, chomp: true)
+  rescue
+    @history = []
+  end
+
+  def history
+    @history ||= history!
+  end
+
+  def includes?(name)
+    history.include?(name)
+  end
+
+  def append(name)
+    history << name
+
+    IO.write(history_path, history.join("\n"))
+  end
+end
+
+class Config
+  ROOT_PATH = File.join(Dir.home, '.config', 'h-torrent')
+  FEED_PATH = File.join(ROOT_PATH, 'feeds')
+  IGNORE_PATH = File.join(ROOT_PATH, 'ignore')
+
+  def self.feeds
+    File.readlines(FEED_PATH, chomp: true)
+  rescue
+    []
+  end
+
+  def self.ignores
+    File.readlines(IGNORE_PATH, chomp: true)
+  rescue
+    []
+  end
+end
+
+class Filetype
+  def self.video?(name)
+    name.match?(/.*[.](mkv|mpe?g|avi|mp4)$/i)
+  end
+end
+
+o = Hiiro.init(*ARGV)
+o.add_subcmd(:fetch) { |*args|
+  feeds = args
+  if feeds.none?
+    feeds = Config.feeds
+  end
+
+  history = History.new
+
+  feeds.each do |feed_url|
+    feed = Feed.new(feed_url)
+
+    torrents = feed.items.inject([]) do |list, item|
+      if history.includes?(item.title)
+        puts format('Skip: "%s"', item.title)
+        next
+      end
+
+      puts format('Fetching torrent: "%s" => "%s"', item.title, item.link)
+
+      list << Torrent.fetch(item.link)
+
+      # TODO: ignore if (normalized?) title includes any ignore patterns
+
+      history.append(item.title)
+      break list if list.count >= 10
+
+      list
+    end
+
+    binding.pry
+  end
+}
+
+o.run

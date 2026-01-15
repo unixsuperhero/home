@@ -1,0 +1,380 @@
+#!/usr/bin/env ruby
+require '/Users/unixsuperhero/bin/h-base.rb'
+
+o = Hiiro.init(*ARGV)
+o.add_subcmd(:vids) { |outfile, *args|
+  outfile = 'index.html' if outfile.nil?
+
+  hash = Digest::SHA1.hexdigest(Dir.pwd)
+  puts hash: hash
+
+  videos = Dir.glob('*.mp4').map { |vid|
+    next if File.directory?(vid)
+
+    vid.inspect
+  }.compact
+
+  puts video_count: videos.count
+
+  videos = videos.join(",\n")
+
+  template = <<~TEMPLATE
+<html>
+  <head>
+    <style>
+      /* a, p, video {
+        margin-top: 20px;
+      } */
+      select, textarea {
+        margin-top: 20px;
+        width: 80%;
+        display: block;
+      }
+      .flex_links {
+        display: flex;
+        gap: 70px;
+        margin-top: 38px;
+        margin-bottom: 38px;
+      }
+      * {
+        font-size: 16pt;
+      }
+
+      a {
+        font-size: 26pt;
+      }
+    </style>
+    <script type="text/javascript">
+      var favs = localStorage.getItem('favs-#{hash}') || '[]';
+      console.log({ favs: favs });
+
+      var videos = [
+        #{videos.gsub(/\n/, "\n        ")}
+      ];
+
+      function create_links() {
+        var container = document.getElementById('links');
+        var player = document.getElementById('player');
+
+        for(var x=0; x < videos.length; x++) {
+          var link = document.createElement('option');
+          link.value = x;
+          link.innerText = videos[x];
+
+          container.appendChild(link);
+        }
+      }
+
+      function load_video() {
+        var player = document.getElementById('player');
+        var src = document.getElementById('player_src');
+        var links = document.getElementById('links');
+        var idx = links.value;
+        var id = parseInt(idx);
+        src.src = videos[id];
+        player.load();
+        player.currentTime = 5;
+        player.play();
+        load_stats();
+      }
+
+      function save_video() {
+        var fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
+        var json = JSON.parse(fav_videos);
+        console.log({ favs: fav_videos, json: json });
+
+        var vid = document.getElementById('links').value;
+        vid = videos[parseInt(vid)];
+
+        if(vid !== undefined) {
+          json.push(vid);
+
+          localStorage.setItem('favs-#{hash}', JSON.stringify(json));
+          fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
+          json = JSON.parse(fav_videos);
+          console.log({ favs: fav_videos, json: json });
+        }
+
+        display_favs();
+      }
+
+      function rm_fav() {
+        var fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
+        var json = JSON.parse(fav_videos);
+        console.log({ favs: fav_videos, json: json });
+
+        var sel = document.getElementById('favs_select');
+        var current_index = sel.selectedIndex;
+        vid = json[current_index];
+
+        json.splice(current_index, 1)
+
+        if(vid !== undefined) {
+          localStorage.setItem('favs-#{hash}', JSON.stringify(json));
+          fav_videos = localStorage.getItem('favs-#{hash}') || '[]';
+          json = JSON.parse(fav_videos);
+          console.log({ favs: fav_videos, json: json });
+        }
+
+        display_favs();
+
+        if(sel.length == 0) return;
+
+        if(current_index >= sel.length) {
+          current_index = sel.length - 1;
+        }
+
+        sel.selectedIndex = current_index;
+        load_fav();
+      }
+
+      function load_fav() {
+        var sel = document.getElementById('favs_select');
+
+        var player = document.getElementById('player');
+        var src = document.getElementById('player_src');
+        src.src = sel.value;
+        player.load();
+        player.currentTime = 5;
+        player.play();
+      }
+
+      function prev_fav() {
+        var sel = document.getElementById('favs_select');
+        if(sel.selectedIndex == 0) return;
+        sel.selectedIndex = sel.selectedIndex - 1;
+        load_fav();
+      }
+
+      function next_fav() {
+        var sel = document.getElementById('favs_select');
+        if(sel.selectedIndex >= sel.length - 1) return;
+        sel.selectedIndex = sel.selectedIndex + 1;
+        load_fav();
+      }
+
+      function export_favs() {
+        var text = document.getElementById('export_favs');
+        var data = localStorage.getItem('favs-#{hash}') || '[]';
+        var list = JSON.parse(data);
+        text.innerHTML = list.join("\\n");
+      }
+
+      function display_favs() {
+        var sel = document.getElementById('favs_select');
+        sel.innerHTML = '';
+
+        var data = localStorage.getItem('favs-#{hash}') || '[]';
+        var favs = JSON.parse(data);
+
+        for(var x=0; x<favs.length; x++) {
+          var opt = document.createElement('option');
+          opt.value = favs[x];
+          opt.innerText = favs[x];
+          sel.appendChild(opt);
+        }
+      }
+
+      function clear_last() {
+        localStorage.removeItem('last_vid-#{hash}');
+
+        show_last();
+      }
+
+      function mark_last() {
+        var sel = document.getElementById('links');
+        var idx = sel.value;
+        var id = parseInt(idx);
+
+        localStorage.setItem('last_vid-#{hash}', videos[id]);
+
+        show_last();
+      }
+
+      function show_last() {
+        var links = document.getElementById('links');
+        var div = document.getElementById('last_vid');
+        var last_vid = localStorage.getItem('last_vid-#{hash}') || 'no last vid';
+        div.innerHTML = last_vid;
+        var found = false;
+        if(last_vid != 'no last vid') {
+          for(var x=0; x<videos.length; x++) {
+            if(videos[x] == last_vid) {
+              found = true;
+              links.selectedIndex = x;
+              load_video();
+              break;
+            }
+          }
+        }
+        if(found == false) {
+          links.selectedIndex = 0;
+          load_stats();
+        }
+      }
+
+      function prev_vid() {
+        var sel = document.getElementById('links');
+        if(sel.selectedIndex == 0) return;
+        sel.selectedIndex = sel.selectedIndex - 1;
+        load_video();
+      }
+
+      function next_vid() {
+        var sel = document.getElementById('links');
+        if(sel.selectedIndex >= sel.length - 1) return;
+        sel.selectedIndex = sel.selectedIndex + 1;
+        load_video();
+        mark_last();
+      }
+
+      function load_stats() {
+        var sel = document.getElementById('links');
+        var cur = document.getElementById('current_idx');
+        var total = document.getElementById('total_links');
+
+        cur.innerHTML = sel.selectedIndex + 1;
+        total.innerHTML = sel.length;
+      }
+
+      function trash() {
+        var sel = document.getElementById('links');
+        var idx = sel.selectedIndex;
+
+        var container = document.getElementById('trash');
+        var link = document.createElement('option');
+        link.value = idx;
+        link.innerText = videos[idx];
+
+        container.appendChild(link);
+      }
+
+      function clear_trash() {
+        var container = document.getElementById('trash');
+        container.innerHTML = '';
+      }
+    </script>
+  </head>
+  <body>
+  :r!ls *.mp4 | sed 's@.*@&lt;video height="480" controls&gt;&lt;source src="&" type="video/mp4"&gt;&lt;/video&gt;@'
+  <hr/>
+
+  <div id="last_vid">not loaded</div>
+  <div class="flex_links">
+    <a href="javascript:void(0);" onclick="mark_last()" />Mark Last</a>
+    <a href="javascript:void(0);" onclick="clear_last()" />Clear Last</a>
+  </div>
+
+  <div id="links_stats">
+    <span id="current_idx">0</span> /
+    <span id="total_links">99999</span>
+  </div>
+
+  <select id="links" size="5" onchange="load_stats(); load_video();">
+  </select>
+
+  <div class="flex_links">
+    <a href="javascript:void(0);" onclick="load_video()" />Load</a>
+    <a href="javascript:void(0);" onclick="save_video()" />Save</a>
+    <a href="javascript:void(0);" onclick="prev_vid()">Prev Vid</a>
+    <a href="javascript:void(0);" onclick="next_vid()">Next Vid</a>
+  </div>
+
+  <select id="favs_select" size="5" onchange="load_fav();">
+  </select>
+
+  <div class="flex_links">
+    <a href="javascript:void(0);" onclick="rm_fav()" />Remove Fav</a>
+    <a href="javascript:void(0);" onclick="load_fav()" />Load Fav</a>
+    <a href="javascript:void(0);" onclick="prev_fav()" />Prev Fav</a>
+    <a href="javascript:void(0);" onclick="next_fav()" />Next Fav</a>
+  </div>
+
+  <select id="trash" size="5">
+  </select>
+
+  <div class="flex_links">
+    <a href="javascript:void(0);" onclick="trash()" />Trash</a>
+    <a href="javascript:void(0);" onclick="clear_trash()" />Clear</a>
+  </div>
+
+  <textarea id="export_favs" rows="5" cols="40">
+  </textarea>
+
+  <div class="flex_links">
+    <a href="javascript:void(0);" onclick="localStorage.removeItem('favs-#{hash}'); display_favs();" />Clear Favs</a>
+    <a href="javascript:void(0);" onclick="export_favs()" />Export Favs</a>
+  </div>
+
+  <div id="player_wrapper">
+    <video id="player" height="480" controls>
+      <source id="player_src" src="">
+    </video>
+  </div>
+
+  <script type="text/javascript">
+    create_links();
+    display_favs();
+    show_last();
+    load_stats();
+  </script>
+  </body>
+</html>
+  TEMPLATE
+
+  size = IO.write(outfile, template)
+
+  puts size: size
+}
+
+o.add_subcmd(:videos) { |outfile, *args|
+  puts :in_html_videos
+
+  if outfile&.match?(/^-/)
+    args = [outfile, *args]
+    outfile = nil
+  end
+
+  outfile = 'index.html' if outfile.nil?
+
+  if File.exist?(outfile) && args.none?{|a| a.match?(/-f/) }
+    puts 'File Exists: use -f flag to force'
+  else
+    tags = Dir.glob('**/*').map { |vid|
+      next if File.directory?(vid)
+
+      file_cmd = format('file --mime-type "%s"', vid)
+      result = %x[ #{file_cmd} ]
+      next unless result.match?(/video\//)
+
+      format('<p>%s</p><video height="480" controls><source src="%s"></video>', vid, vid)
+    }.compact
+
+    template = <<~TEMPLATE
+    <html>
+      <head>
+        <style>
+          a, p, video {
+            display: block;
+            margin-top: 20px;
+          }
+        </style>
+      </head>
+      <body>
+:r!ls *.mp4 | sed 's@.*@&lt;video height="480" controls&gt;&lt;source src="&" type="video/mp4"&gt;&lt;/video&gt;@'
+<hr/>
+      %s
+      </body>
+    </html>
+    TEMPLATE
+
+    contents = format(template, tags.join("\n"))
+    bytes = IO.write(outfile, contents)
+
+    printf("video count: %d\n", tags.count)
+    printf("bytes_written: %d\n", bytes)
+  end
+}
+
+o.run
+

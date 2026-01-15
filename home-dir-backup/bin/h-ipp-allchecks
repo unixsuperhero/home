@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+
+const { spawn } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const readline = require('readline');
+
+const scripts = [
+    ['/Users/joshuatoyota/bin/h', 'ipp', 'lint', '--fix'],
+    ['/Users/joshuatoyota/bin/h', 'ipp', 'tests'],
+    ['/Users/joshuatoyota/bin/h', 'ipp', 'types'],
+];
+
+const tmpDir = os.tmpdir()
+const successfulStatus = '✅ Success'
+const failedStatus = '❌ Failed'
+
+const statuses = new Map();
+const logs = new Map();
+
+function runScript(script) {
+    return new Promise((resolve) => {
+        const process = spawn('ruby', script, { stdio: 'pipe' });
+
+        const tmpFileName = script.join('_').replace(/[^a-zA-Z.]+/g, '_')
+        const tmpFile = path.join(tmpDir, `${tmpFileName}-error.log`);
+
+        statuses.set(script, 'Running');
+        logs.set(script, tmpFile)
+
+        console.log(`[${script.join(' ')}] Started...`);
+
+        let output = '';
+
+        process.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+
+        process.stderr.on('data', (data) => {
+            output += data.toString();
+        });
+
+        process.on('close', (code) => {
+            fs.writeFileSync(logs.get(script), output);
+
+            if (code === 0) {
+                statuses.set(script, successfulStatus);
+                console.log(`[${script.join(' ')}] ✅ Completed`);
+                resolve();
+            } else {
+                statuses.set(script, failedStatus);
+                console.log(`[${script.join(' ')}] ❌ Failed!`);
+                resolve();
+            }
+        });
+    });
+}
+
+async function main() {
+    console.log('Starting scripts...\n');
+
+    await Promise.all(scripts.map(runScript));
+
+    let successCount = 0
+    let failCount = 0
+    console.log('\nFinal Status:');
+    statuses.forEach((status, script) => {
+        if (status == successfulStatus) {
+            successCount++
+        } else {
+            failCount++
+        }
+        console.log(`- ${script}: ${status}`);
+    });
+
+    if (successCount > 0) {
+        console.log()
+        console.log('Successful Logs:')
+        statuses.entries().filter((entry, status) => entry[1] == successfulStatus).forEach((entry, status) => {
+            const script = entry[0]
+            console.log('cat', logs.get(script), '#', script.join(' '))
+        })
+    }
+
+    if (failCount > 0) {
+        console.log()
+        console.log('Failed Logs:')
+        statuses.entries().filter((entry, status) => entry[1] != successfulStatus).forEach((entry, status) => {
+            const script = entry[0]
+            console.log('vim', logs.get(script), '#', script.join(' '))
+        })
+        process.exit(1);
+    }
+    process.exit(0);
+}
+
+main();
+

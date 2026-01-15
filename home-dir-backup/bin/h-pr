@@ -1,0 +1,118 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+require File.join(Dir.home, 'bin', 'h-base.rb')
+require File.join(Dir.home, 'bin', 'pr.rb')
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:edit) { |*args|
+  nvim = ENV['EDITOR']
+  system(nvim, __FILE__)
+}
+
+o.add_subcmd(:breakdown) { |*pr_numbers|
+  possible_values = Hash.new { |h, k| h[k] = [] }
+  value_by_pr = Hash.new { |h, k| h[k] = [] }
+
+  prs = Pr.fetch_all
+  all_prs = []
+
+  Dir.glob('tmp/prs.*.json').each do |file|
+    data = File.read(file)
+    json = JSON.parse(data) rescue []
+
+    current_prs = []
+
+    if json.is_a?(Hash) && json.key?("createdBy")
+      current_prs = (result["createdBy"] + result["needsReview"]) << result["currentBranch"]
+    elsif json.is_a?(Hash) && json.key?("number")
+      current_prs << json
+    elsif json.is_a?(Array)
+      current_prs = json
+    else
+      binding.pry
+      next
+    end
+
+    all_prs += current_prs
+    current_prs.each do |pr|
+      pr = Pr.new(pr)
+      vals = pr.to_h
+      %i[merge_state_status mergeable review_decision state].each do |k|
+        v = vals[k]
+        binding.pry if v.nil?
+        possible_values[k] << v unless possible_values[k].include?(v)
+        value_by_pr[v] << pr.number unless value_by_pr[v].include?(pr.number)
+      end
+    end
+  end
+
+  all_prs += prs
+  prs.each do |pr|
+    vals = pr.to_h
+    %i[merge_state_status mergeable review_decision state].each do |k|
+      v = vals[k]
+      binding.pry if v.nil?
+      possible_values[k] << v unless possible_values[k].include?(v)
+      value_by_pr[v] << pr.number unless value_by_pr[v].include?(pr.number)
+    end
+  end
+
+  binding.pry
+}
+
+o.add_subcmd(:history) { |*pr_numbers|
+  pr_numbers.each do |pr_num|
+    puts
+    puts "# PR ##{pr_num}"
+    puts "==============="
+
+    files = `egrep -l "#{pr_num}" tmp/prs.*.json`.lines(chomp: true).sort
+
+    last_pr = nil
+    files.each do |cur_file|
+      json = IO.read(cur_file)
+
+      timestamp = cur_file[/\d\d*/]
+
+      prs = Pr.prs_from_json(json) rescue :failed
+      next if prs == :failed
+
+      cur_pr = prs[pr_num.to_i]
+
+      if last_pr.nil?
+        last_pr = cur_pr
+
+        puts "timestamp: #{timestamp}"
+        cur_pr.to_h.each do |k, v|
+          puts "#{k} STARTED AT #{v.inspect}"
+        end
+
+        puts
+
+        next
+      end
+
+      changes = cur_pr.diff(last_pr)
+      last_pr = cur_pr
+
+      next if changes.empty?
+
+      puts "timestamp: #{timestamp}"
+      changes.each do |k, (old_v, new_v)|
+        puts "#{k} CHANGED FROM #{old_v.inspect} TO #{new_v.inspect}"
+      end
+
+      puts
+    end
+  end
+}
+
+begin
+  o.run
+rescue => e
+  binding.pry
+end
+
