@@ -47,6 +47,7 @@ alias gph="git push origin HEAD"
 alias gpod="git pull origin development"
 alias gpom="git pull origin master"
 alias gpr="git pull --rebase"
+alias gss="git add --all -N; git diff head --name-only --diff-filter=d"
 alias gst="git status -s"
 alias spring="bin/spring"
 alias st="git status -s"
@@ -91,12 +92,12 @@ alias ezs="vim ~/.zshrc"
 alias .zs="source ~/.zshrc"
 
 alias rg="rg -S"
-alias ls="ls -1"
-alias ll="ls -l"
-alias lsr="ls -1tr"
-alias llr="ls -ltr"
+alias ls="ls -A1"
+alias ll="ls -Al"
+alias lsr="ls -A1tr"
+alias llr="ls -Altr"
 
-function gss() {
+function _gss() {
   if test $# -gt 0; then
     git status -s | sed 's/...//;s/.* -> //' | rg -i "$*"
   else
