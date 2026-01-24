@@ -1,40 +1,518 @@
 #!/usr/bin/env ruby
-load '/Users/unixsuperhero/bin/h'
+
+require 'hiiro'
 
 o = Hiiro.init(*ARGV)
 
-o.add_subcmd(:other_resize) { |infile, scale, outfile|
+# Helper for generating output filenames
+def output_name(infile, suffix, new_ext = nil)
+  ext = File.extname(infile)
+  basename = File.basename(infile, ext)
+  new_ext ||= ext
+  new_ext = '.' + new_ext unless new_ext.start_with?('.')
+  "#{basename}.#{suffix}#{new_ext}"
+end
+
+# === INFO / INSPECTION ===
+
+o.add_subcmd(:info) { |ifile|
+  raise 'Missing required argument: input_file' if ifile.nil? || ifile.strip == ''
+  require 'json'
+  require 'open3'
+
+  json, status = Open3.capture2('ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', ifile)
+  raise "ffprobe failed: #{status}" unless status.success?
+
+  data = JSON.parse(json)
+  format = data['format'] || {}
+  streams = data['streams'] || []
+
+  # Format file size nicely
+  format_size = ->(bytes) {
+    return 'unknown' unless bytes
+    bytes = bytes.to_f
+    units = ['B', 'KB', 'MB', 'GB']
+    unit = 0
+    while bytes >= 1024 && unit < units.length - 1
+      bytes /= 1024
+      unit += 1
+    end
+    "%.2f %s" % [bytes, units[unit]]
+  }
+
+  # Format duration nicely
+  format_duration = ->(seconds) {
+    return 'unknown' unless seconds
+    seconds = seconds.to_f
+    hours = (seconds / 3600).to_i
+    minutes = ((seconds % 3600) / 60).to_i
+    secs = (seconds % 60).to_i
+    ms = ((seconds % 1) * 1000).to_i
+    if hours > 0
+      "%d:%02d:%02d.%03d" % [hours, minutes, secs, ms]
+    else
+      "%02d:%02d.%03d" % [minutes, secs, ms]
+    end
+  }
+
+  # Format bitrate nicely
+  format_bitrate = ->(bps) {
+    return nil unless bps
+    bps = bps.to_f
+    if bps >= 1_000_000
+      "%.2f Mbps" % (bps / 1_000_000)
+    else
+      "%.0f kbps" % (bps / 1000)
+    end
+  }
+
+  puts "=" * 60
+  puts "FILE: #{File.basename(ifile)}"
+  puts "=" * 60
+  puts "Format:    #{format['format_long_name'] || format['format_name'] || 'unknown'}"
+  puts "Duration:  #{format_duration.call(format['duration'])}"
+  puts "Size:      #{format_size.call(format['size'])}"
+  puts "Bitrate:   #{format_bitrate.call(format['bit_rate']) || 'unknown'}"
+
+  video_streams = streams.select { |s| s['codec_type'] == 'video' }
+  audio_streams = streams.select { |s| s['codec_type'] == 'audio' }
+  sub_streams = streams.select { |s| s['codec_type'] == 'subtitle' }
+
+  video_streams.each_with_index do |v, i|
+    puts "-" * 60
+    puts "VIDEO #{i}: #{v['codec_long_name'] || v['codec_name']}"
+    puts "  Resolution:  #{v['width']}x#{v['height']}"
+    if v['display_aspect_ratio']
+      puts "  Aspect:      #{v['display_aspect_ratio']}"
+    end
+    if v['r_frame_rate']
+      num, den = v['r_frame_rate'].split('/').map(&:to_f)
+      fps = den > 0 ? (num / den).round(2) : 0
+      puts "  FPS:         #{fps}"
+    end
+    if v['bit_rate']
+      puts "  Bitrate:     #{format_bitrate.call(v['bit_rate'])}"
+    end
+    if v['pix_fmt']
+      puts "  Pixel fmt:   #{v['pix_fmt']}"
+    end
+  end
+
+  audio_streams.each_with_index do |a, i|
+    puts "-" * 60
+    lang = a.dig('tags', 'language')
+    title = a.dig('tags', 'title')
+    label = [lang, title].compact.join(' - ')
+    label = label.empty? ? '' : " (#{label})"
+    puts "AUDIO #{i}:#{label} #{a['codec_long_name'] || a['codec_name']}"
+    if a['channels']
+      channel_layout = a['channel_layout'] || "#{a['channels']}ch"
+      puts "  Channels:    #{channel_layout}"
+    end
+    if a['sample_rate']
+      puts "  Sample rate: #{a['sample_rate']} Hz"
+    end
+    if a['bit_rate']
+      puts "  Bitrate:     #{format_bitrate.call(a['bit_rate'])}"
+    end
+  end
+
+  if sub_streams.any?
+    puts "-" * 60
+    puts "SUBTITLES:"
+    sub_streams.each_with_index do |s, i|
+      lang = s.dig('tags', 'language') || 'unknown'
+      title = s.dig('tags', 'title')
+      codec = s['codec_name']
+      label = title ? "#{lang} - #{title}" : lang
+      puts "  #{i}: [#{codec}] #{label}"
+    end
+  end
+
+  puts "=" * 60
+}
+
+o.add_subcmd(:streams) { |ifile|
+  raise 'Missing required argument: input_file' if ifile.nil? || ifile.strip == ''
+  system('ffprobe', '-v', 'error', '-show_entries', 'stream=index,codec_type,codec_name,width,height,duration,bit_rate', '-of', 'default=noprint_wrappers=1', ifile)
+}
+
+o.add_subcmd(:duration) { |ifile|
+  raise 'Missing required argument: input_file' if ifile.nil? || ifile.strip == ''
+  system('ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', ifile)
+}
+
+# === RESIZING ===
+
+o.add_subcmd(:resize) { |infile, scale, outfile|
   raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
   scale ||= '720'
-  outfile ||= proc {
-    temp_name = infile.dup || ''
-    ext = File.extname(temp_name)
-    basename = File.basename(temp_name, ext)
-    [basename, :resized, scale + 'p', ext].join('.').gsub(/[.][.]+/, ?.)
-  }.call
+  outfile ||= output_name(infile, "#{scale}p")
 
   dimensions = ['-2', scale].join(':')
   scale_arg = [:scale, dimensions].join(?=)
   system('ffmpeg', '-i', infile, '-vf', scale_arg, outfile)
 }
 
-o.add_subcmd(:resize) { |ofile, scale, nfile|
-  raise 'arg error' if [ofile, scale, nfile].compact.count != 3
-
-  puts msg: :inside_video, called: :handler, aka: :subcmd
-
-  scale_arg = [:scale, scale].join(?=)
-  system('ffmpeg', '-i', ofile, '-vf', scale_arg, nfile)
+o.add_subcmd(:resize720) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, '720p')
+  system('ffmpeg', '-i', infile, '-vf', 'scale=-2:720', outfile)
 }
 
-o.add_subcmd(:reencode) { |ofile, nfile|
-  raise 'arg error' if [ofile, nfile].compact.count != 2
-
-  system('ffmpeg', '-i', ofile, nfile)
+o.add_subcmd(:resize1080) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, '1080p')
+  system('ffmpeg', '-i', infile, '-vf', 'scale=-2:1080', outfile)
 }
 
-o.add_subcmd(:info) { |ifile|
-  system('ffprobe', ifile)
+# === FORMAT CONVERSION ===
+
+o.add_subcmd(:convert) { |infile, format, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: format (e.g., mp4, mkv, avi, webm)' if format.nil? || format.strip == ''
+  outfile ||= output_name(infile, 'converted', format)
+  system('ffmpeg', '-i', infile, outfile)
+}
+
+o.add_subcmd(:to_mp4) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'converted', 'mp4')
+  system('ffmpeg', '-i', infile, '-c:v', 'libx264', '-c:a', 'aac', outfile)
+}
+
+o.add_subcmd(:to_webm) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'converted', 'webm')
+  system('ffmpeg', '-i', infile, '-c:v', 'libvpx-vp9', '-c:a', 'libopus', outfile)
+}
+
+o.add_subcmd(:to_mkv) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'converted', 'mkv')
+  system('ffmpeg', '-i', infile, '-c', 'copy', outfile)
+}
+
+# === AUDIO EXTRACTION ===
+
+o.add_subcmd(:audio) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'audio', 'mp3')
+  system('ffmpeg', '-i', infile, '-vn', '-acodec', 'libmp3lame', '-q:a', '2', outfile)
+}
+
+o.add_subcmd(:audio_wav) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'audio', 'wav')
+  system('ffmpeg', '-i', infile, '-vn', outfile)
+}
+
+o.add_subcmd(:audio_aac) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'audio', 'aac')
+  system('ffmpeg', '-i', infile, '-vn', '-c:a', 'aac', '-b:a', '192k', outfile)
+}
+
+o.add_subcmd(:audio_flac) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'audio', 'flac')
+  system('ffmpeg', '-i', infile, '-vn', '-c:a', 'flac', outfile)
+}
+
+# === CLIP EXTRACTION ===
+
+# Usage: h-video clip input.mp4 00:01:30 60 [output.mp4]
+# Extracts 60 seconds starting at 1:30
+o.add_subcmd(:clip) { |infile, start_time, duration, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: start_time (e.g., 00:01:30 or 90)' if start_time.nil? || start_time.strip == ''
+  raise 'Missing required argument: duration (seconds or HH:MM:SS)' if duration.nil? || duration.strip == ''
+  outfile ||= output_name(infile, "clip_#{start_time.gsub(':', '-')}")
+  system('ffmpeg', '-i', infile, '-ss', start_time, '-t', duration, '-c', 'copy', outfile)
+}
+
+# Usage: h-video clip_to input.mp4 00:01:30 00:02:30 [output.mp4]
+# Extracts from 1:30 to 2:30
+o.add_subcmd(:clip_to) { |infile, start_time, end_time, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: start_time (e.g., 00:01:30 or 90)' if start_time.nil? || start_time.strip == ''
+  raise 'Missing required argument: end_time (e.g., 00:02:30 or 150)' if end_time.nil? || end_time.strip == ''
+  outfile ||= output_name(infile, "clip_#{start_time.gsub(':', '-')}_to_#{end_time.gsub(':', '-')}")
+  system('ffmpeg', '-i', infile, '-ss', start_time, '-to', end_time, '-c', 'copy', outfile)
+}
+
+# Re-encode clip (slower but more accurate cuts)
+o.add_subcmd(:clip_precise) { |infile, start_time, duration, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: start_time' if start_time.nil? || start_time.strip == ''
+  raise 'Missing required argument: duration' if duration.nil? || duration.strip == ''
+  outfile ||= output_name(infile, "clip_precise_#{start_time.gsub(':', '-')}")
+  system('ffmpeg', '-i', infile, '-ss', start_time, '-t', duration, outfile)
+}
+
+# === SUBTITLE EXTRACTION ===
+
+o.add_subcmd(:subs) { |infile, stream_index, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  stream_index ||= '0'
+  outfile ||= output_name(infile, "subs_#{stream_index}", 'srt')
+  system('ffmpeg', '-i', infile, '-map', "0:s:#{stream_index}", outfile)
+}
+
+o.add_subcmd(:subs_all) { |infile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  basename = File.basename(infile, File.extname(infile))
+  system('ffmpeg', '-i', infile, '-map', '0:s', "#{basename}.subs.%d.srt")
+}
+
+o.add_subcmd(:list_subs) { |infile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  system('ffprobe', '-v', 'error', '-select_streams', 's', '-show_entries', 'stream=index,codec_name:stream_tags=language,title', '-of', 'default=noprint_wrappers=1', infile)
+}
+
+# === IMAGE/THUMBNAIL EXTRACTION ===
+
+o.add_subcmd(:thumbnail) { |infile, timestamp, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  timestamp ||= '00:00:01'
+  outfile ||= output_name(infile, "thumb_#{timestamp.gsub(':', '-')}", 'jpg')
+  system('ffmpeg', '-i', infile, '-ss', timestamp, '-vframes', '1', outfile)
+}
+
+o.add_subcmd(:thumbnails) { |infile, interval, outfile_pattern|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  interval ||= '10'
+  basename = File.basename(infile, File.extname(infile))
+  outfile_pattern ||= "#{basename}.thumb.%04d.jpg"
+  system('ffmpeg', '-i', infile, '-vf', "fps=1/#{interval}", outfile_pattern)
+}
+
+# === GIF CREATION ===
+
+o.add_subcmd(:gif) { |infile, start_time, duration, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'animated', 'gif')
+
+  args = ['ffmpeg', '-i', infile]
+  args += ['-ss', start_time] if start_time && start_time.strip != ''
+  args += ['-t', duration] if duration && duration.strip != ''
+  args += ['-vf', 'fps=10,scale=480:-1:flags=lanczos', '-loop', '0', outfile]
+  system(*args)
+}
+
+o.add_subcmd(:gif_hq) { |infile, start_time, duration, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'animated_hq', 'gif')
+  palette = "/tmp/palette_#{$$}.png"
+
+  filters = 'fps=15,scale=640:-1:flags=lanczos'
+  time_args = []
+  time_args += ['-ss', start_time] if start_time && start_time.strip != ''
+  time_args += ['-t', duration] if duration && duration.strip != ''
+
+  # Generate palette
+  system('ffmpeg', '-i', infile, *time_args, '-vf', "#{filters},palettegen", '-y', palette)
+  # Create GIF using palette
+  system('ffmpeg', '-i', infile, '-i', palette, *time_args, '-lavfi', "#{filters} [x]; [x][1:v] paletteuse", '-y', outfile)
+  File.delete(palette) if File.exist?(palette)
+}
+
+# === AUDIO MANIPULATION ===
+
+o.add_subcmd(:mute) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'muted')
+  system('ffmpeg', '-i', infile, '-c:v', 'copy', '-an', outfile)
+}
+
+o.add_subcmd(:replace_audio) { |video_file, audio_file, outfile|
+  raise 'Missing required argument: video_file' if video_file.nil? || video_file.strip == ''
+  raise 'Missing required argument: audio_file' if audio_file.nil? || audio_file.strip == ''
+  outfile ||= output_name(video_file, 'new_audio')
+  system('ffmpeg', '-i', video_file, '-i', audio_file, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', outfile)
+}
+
+o.add_subcmd(:volume) { |infile, level, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: level (e.g., 2.0 for 2x, 0.5 for half)' if level.nil? || level.strip == ''
+  outfile ||= output_name(infile, "vol_#{level}")
+  system('ffmpeg', '-i', infile, '-filter:a', "volume=#{level}", '-c:v', 'copy', outfile)
+}
+
+# === SPEED / TEMPO ===
+
+o.add_subcmd(:speed) { |infile, factor, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: factor (e.g., 2.0 for 2x speed, 0.5 for half speed)' if factor.nil? || factor.strip == ''
+  outfile ||= output_name(infile, "speed_#{factor}x")
+  video_speed = 1.0 / factor.to_f
+  audio_speed = factor.to_f
+  system('ffmpeg', '-i', infile, '-filter_complex', "[0:v]setpts=#{video_speed}*PTS[v];[0:a]atempo=#{audio_speed}[a]", '-map', '[v]', '-map', '[a]', outfile)
+}
+
+# === COMPRESSION ===
+
+o.add_subcmd(:compress) { |infile, crf, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  crf ||= '28'  # Higher = more compression, lower quality. 18-28 is reasonable.
+  outfile ||= output_name(infile, "compressed_crf#{crf}")
+  system('ffmpeg', '-i', infile, '-c:v', 'libx264', '-crf', crf, '-preset', 'medium', '-c:a', 'aac', '-b:a', '128k', outfile)
+}
+
+o.add_subcmd(:compress_small) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'small')
+  system('ffmpeg', '-i', infile, '-c:v', 'libx264', '-crf', '32', '-preset', 'slower', '-c:a', 'aac', '-b:a', '96k', '-vf', 'scale=-2:480', outfile)
+}
+
+# === ROTATION / TRANSFORMATION ===
+
+o.add_subcmd(:rotate) { |infile, direction, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  direction ||= 'cw'  # cw, ccw, 180
+
+  transpose = case direction
+  when 'cw', 'clockwise', '90' then '1'
+  when 'ccw', 'counterclockwise', '-90', '270' then '2'
+  when '180' then '2,transpose=2'
+  else '1'
+  end
+
+  outfile ||= output_name(infile, "rotated_#{direction}")
+  system('ffmpeg', '-i', infile, '-vf', "transpose=#{transpose}", outfile)
+}
+
+o.add_subcmd(:flip_h) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'flipped_h')
+  system('ffmpeg', '-i', infile, '-vf', 'hflip', '-c:a', 'copy', outfile)
+}
+
+o.add_subcmd(:flip_v) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'flipped_v')
+  system('ffmpeg', '-i', infile, '-vf', 'vflip', '-c:a', 'copy', outfile)
+}
+
+# === CROPPING ===
+
+# Usage: h-video crop input.mp4 640:480:100:50 [output.mp4]
+# Crops to 640x480 starting at x=100, y=50
+o.add_subcmd(:crop) { |infile, crop_params, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: crop_params (w:h:x:y, e.g., 640:480:100:50)' if crop_params.nil? || crop_params.strip == ''
+  outfile ||= output_name(infile, 'cropped')
+  system('ffmpeg', '-i', infile, '-vf', "crop=#{crop_params}", outfile)
+}
+
+# === CONCATENATION ===
+
+# Usage: h-video concat file1.mp4 file2.mp4 file3.mp4 output.mp4
+o.add_subcmd(:concat) { |*args|
+  raise 'Need at least 2 input files and 1 output file' if args.length < 3
+  outfile = args.pop
+  infiles = args
+
+  # Create concat file
+  concat_file = "/tmp/concat_#{$$}.txt"
+  File.open(concat_file, 'w') do |f|
+    infiles.each { |file| f.puts "file '#{File.expand_path(file)}'" }
+  end
+
+  system('ffmpeg', '-f', 'concat', '-safe', '0', '-i', concat_file, '-c', 'copy', outfile)
+  File.delete(concat_file) if File.exist?(concat_file)
+}
+
+# === FRAME RATE ===
+
+o.add_subcmd(:fps) { |infile, rate, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  raise 'Missing required argument: rate (e.g., 30, 24, 60)' if rate.nil? || rate.strip == ''
+  outfile ||= output_name(infile, "#{rate}fps")
+  system('ffmpeg', '-i', infile, '-filter:v', "fps=#{rate}", outfile)
+}
+
+# === METADATA ===
+
+o.add_subcmd(:metadata) { |infile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  system('ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', infile)
+}
+
+o.add_subcmd(:strip_metadata) { |infile, outfile|
+  raise 'Missing required argument: input_file' if infile.nil? || infile.strip == ''
+  outfile ||= output_name(infile, 'clean')
+  system('ffmpeg', '-i', infile, '-map_metadata', '-1', '-c', 'copy', outfile)
+}
+
+# === HELP ===
+
+o.add_subcmd(:help) { |*args|
+  puts <<~HELP
+    h-video - FFmpeg wrapper for common video operations
+
+    INFO / INSPECTION:
+      info <file>                         Human-readable video summary
+      streams <file>                      List all streams (video, audio, subs)
+      duration <file>                     Get video duration
+      metadata <file>                     Show metadata as JSON
+      list_subs <file>                    List subtitle tracks
+
+    RESIZING:
+      resize <file> [height] [out]        Resize to height (default 720)
+      resize720 <file> [out]              Resize to 720p
+      resize1080 <file> [out]             Resize to 1080p
+
+    FORMAT CONVERSION:
+      convert <file> <format> [out]       Convert to format (mp4, mkv, webm, etc.)
+      to_mp4 <file> [out]                 Convert to MP4 (H.264/AAC)
+      to_webm <file> [out]                Convert to WebM (VP9/Opus)
+      to_mkv <file> [out]                 Remux to MKV container
+
+    AUDIO:
+      audio <file> [out]                  Extract audio as MP3
+      audio_wav <file> [out]              Extract audio as WAV
+      audio_aac <file> [out]              Extract audio as AAC
+      audio_flac <file> [out]             Extract audio as FLAC
+      mute <file> [out]                   Remove audio track
+      replace_audio <video> <audio> [out] Replace audio track
+      volume <file> <level> [out]         Adjust volume (2.0 = 2x, 0.5 = half)
+
+    CLIPPING:
+      clip <file> <start> <duration> [out]      Extract clip by duration
+      clip_to <file> <start> <end> [out]        Extract clip by end time
+      clip_precise <file> <start> <dur> [out]   Re-encoded clip (more accurate)
+
+    SUBTITLES:
+      subs <file> [stream_idx] [out]      Extract subtitle track (default: first)
+      subs_all <file>                     Extract all subtitle tracks
+
+    IMAGES:
+      thumbnail <file> [time] [out]       Extract single frame
+      thumbnails <file> [interval] [pattern]  Extract frames every N seconds
+
+    GIF:
+      gif <file> [start] [duration] [out]     Create GIF (standard quality)
+      gif_hq <file> [start] [duration] [out]  Create high-quality GIF
+
+    TRANSFORMATION:
+      speed <file> <factor> [out]         Change speed (2.0 = 2x faster)
+      rotate <file> [dir] [out]           Rotate (cw, ccw, 180)
+      flip_h <file> [out]                 Flip horizontally
+      flip_v <file> [out]                 Flip vertically
+      crop <file> <w:h:x:y> [out]         Crop video
+      fps <file> <rate> [out]             Change frame rate
+
+    COMPRESSION:
+      compress <file> [crf] [out]         Compress (crf: 18-28, higher = smaller)
+      compress_small <file> [out]         Aggressive compression + 480p
+
+    OTHER:
+      concat <file1> <file2> ... <out>    Join multiple videos
+      strip_metadata <file> [out]         Remove all metadata
+
+    Time format: HH:MM:SS or seconds (e.g., 01:30:00 or 5400)
+  HELP
 }
 
 if o.runnable?

@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
-load File.join(Dir.home, 'bin', 'h')
+
+require 'hiiro'
 require 'net/http'
 require 'uri'
 require 'nokogiri'

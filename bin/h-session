@@ -13,11 +13,11 @@ o.add_subcmd(:new) { |*args|
 }
 
 o.add_subcmd(:kill) { |*args|
-  system('tmux', 'kill-session', *args)
+  system('tmux', 'kill-session', '-t', *args)
 }
 
 o.add_subcmd(:attach) { |*args|
-  system('tmux', 'attach-session', *args)
+  system('tmux', 'attach-session', '-t', *args)
 }
 
 o.add_subcmd(:rename) { |*args|
@@ -25,7 +25,7 @@ o.add_subcmd(:rename) { |*args|
 }
 
 o.add_subcmd(:switch) { |*args|
-  system('tmux', 'switch-client', *args)
+  system('tmux', 'switch-client', '-t', *args)
 }
 
 o.add_subcmd(:detach) { |*args|

@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-load File.join(Dir.home, 'bin', 'h')
+require "hiiro"
 
 o = Hiiro.init(*ARGV)
 o.add_subcmd(:vids) { |outfile, *args|

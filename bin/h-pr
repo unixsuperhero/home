@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 
 require 'json'
+require 'hiiro'
 
-load File.join(Dir.home, 'bin', 'h')
 require File.join(Dir.home, 'bin', 'pr.rb')
 
 o = Hiiro.init(*ARGV)

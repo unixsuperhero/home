@@ -1,6 +1,16 @@
 #!/usr/bin/env ruby
 
-load File.join(Dir.home, 'bin', 'h')
+require "hiiro"
+
+def find_buffer(partial)
+  buffer_list = `tmux list-buffers`.lines.map{|line| line.split(/:/, 2).first }
+
+  buffer, *other = buffer_list.grep(Regexp.new(partial))
+
+  return nil if other.any?
+
+  buffer
+end
 
 o = Hiiro.init(*ARGV, plugins: [Pins])
 
@@ -8,8 +18,10 @@ o.add_subcmd(:ls) { |*args|
   system('tmux', 'list-buffers', *args)
 }
 
-o.add_subcmd(:show) { |*args|
-  system('tmux', 'show-buffer', *args)
+o.add_subcmd(:show) { |name, *args|
+  buffer = find_buffer(name)
+
+  system('tmux', 'show-buffer', '-b', buffer, *args)
 }
 
 o.add_subcmd(:save) { |*args|
