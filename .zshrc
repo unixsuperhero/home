@@ -129,6 +129,22 @@ function pad() {
 export PS1=$'\n'"%~ \$(git_prompt_info)"$'\n'"%#> "
 
 export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
+
+# Set git-related env vars before each prompt
+function _set_git_vars() {
+  if git rev-parse --show-toplevel &>/dev/null; then
+    export b="$(git branch --show-current)"
+    export lb="origin/$cb"
+    export ub="origin $cb"
+    export m="$(git master)"
+    export lm="origin/$m"
+    export um="origin $m"
+  else
+    unset cb cbo ocb m om b lb ub m lm um
+  fi
+}
+precmd_functions+=(_set_git_vars)
+
 source <(starship init zsh --print-full-init)
 
 eval "$(rbenv init -)"
