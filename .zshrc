@@ -31,6 +31,7 @@ alias gaa="git add --all"
 alias gb="git branch -i"
 alias gbr="git branch -i --sort=authordate"
 alias gc="git commit"
+alias gane="git commit --amend --no-edit"
 alias gco="git checkout"
 alias gd="git diff"
 alias gdc="git diff --cached"
@@ -137,4 +138,10 @@ export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
 
 export TERM=screen-256color
 
-source /Users/unixsuperhero/.config/broot/launcher/bash/br
+source $HOME/.config/broot/launcher/bash/br
+export PATH="$HOME/.local/bin:$PATH"
+
+# DaVinci Resolve MCP Server environment variables
+export RESOLVE_SCRIPT_API="/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting"
+export RESOLVE_SCRIPT_LIB="/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so"
+export PYTHONPATH="$PYTHONPATH:$RESOLVE_SCRIPT_API/Modules/"

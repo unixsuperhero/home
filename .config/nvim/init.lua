@@ -740,7 +740,7 @@ vim.cmd[[colorscheme solarized-osaka]]
 local function dupe_slide()
   vim.cmd[[?---?,/\%$\|\n\(---\)\@=/y]]
   vim.cmd[[/\n\(---\)\@=\|\%$/]]
-  vim.cmd[[norm p]]
+  vim.cmd[[norm p]]
 end
 
 vim.keymap.set('n', ',sd', dupe_slide)

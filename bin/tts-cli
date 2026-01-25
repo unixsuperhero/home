@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""CLI tool to generate TTS audio from a text file, line by line."""
+
+import argparse
+import os
+import re
+import sys
+import requests
+from pathlib import Path
+
+
+def sanitize_for_filename(text, max_length=50):
+    """Convert text to a safe filename component using only [a-zA-Z0-9_-]."""
+    # Replace spaces with underscores
+    text = text.replace(" ", "_")
+    # Remove any character that isn't alphanumeric, underscore, or hyphen
+    text = re.sub(r"[^a-zA-Z0-9_-]", "", text)
+    # Collapse multiple underscores/hyphens
+    text = re.sub(r"[-_]+", "_", text)
+    # Trim to max length
+    return text[:max_length].strip("_-")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate TTS audio from a text file, one line at a time."
+    )
+    parser.add_argument("filepath", help="Path to the input text file")
+    parser.add_argument("--format", type=str, default="wav", help="Output audio format (e.g., wav, mp3)")
+    parser.add_argument(
+        "--inference-timesteps",
+        type=int,
+        default=20,
+        help="Inference timesteps (default: 20)",
+    )
+    parser.add_argument(
+        "--cfg-value",
+        type=float,
+        default=2,
+        help="CFG value (default: 2)",
+    )
+    parser.add_argument(
+        "--voice",
+        default="yt-no-hum",
+        help="Voice to use (default: a_mine)",
+    )
+    parser.add_argument(
+        "--endpoint",
+        default="http://localhost:8000/v1/audio/speech",
+        help="TTS API endpoint",
+    )
+    parser.add_argument(
+        "--max-length",
+        type=int,
+        default=2048,
+        help="Max length (default: 2048)",
+    )
+
+    args = parser.parse_args()
+
+    filepath = Path(args.filepath)
+    if not filepath.exists():
+        print(f"Error: File not found: {filepath}", file=sys.stderr)
+        sys.exit(1)
+
+    with open(filepath, "r") as f:
+        lines = f.readlines()
+
+    base_name = filepath.stem
+    output_dir = filepath.parent
+
+    for i, line in enumerate(lines, start=1):
+        text = line.strip()
+        if not text:
+            print(f"Line {i}: (empty, skipping)")
+            continue
+
+        payload = {
+            "input": text,
+            "response_format": args.format,
+            "max_length": args.max_length,
+            "cfg_value": args.cfg_value,
+            "inference_timesteps": args.inference_timesteps,
+            "voice": args.voice,
+        }
+
+        print(f"Line {i}: {text[:50]}{'...' if len(text) > 50 else ''}")
+        safe_text = sanitize_for_filename(text)
+
+        for version in range(1, 6):
+            try:
+                response = requests.post(
+                    args.endpoint,
+                    json=payload,
+                    headers={
+                        # "Accept": f"audio/{args.format}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                response.raise_for_status()
+
+                output_file = output_dir / f"{base_name}_{i:04d}_v{version}_{safe_text}.{args.format}"
+                with open(output_file, "wb") as out:
+                    out.write(response.content)
+                print(f"  -> Saved: {output_file}")
+
+            except requests.RequestException as e:
+                print(f"  -> Error (v{version}): {e}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

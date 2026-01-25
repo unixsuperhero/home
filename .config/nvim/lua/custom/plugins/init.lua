@@ -15,4 +15,10 @@ return {
     priority = 1000,
     opts = {},
   },
+  {
+    "unixsuperhero/demo.nvim",
+    lazy = false,
+    priority = 1000,
+    opts = {},
+  },
 }

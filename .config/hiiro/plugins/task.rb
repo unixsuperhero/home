@@ -10,12 +10,29 @@ module Task
   end
 
   def self.add_subcommands(hiiro)
-    hiiro.add_subcmd(:task) do |*args, **v|
+    hiiro.add_subcmd(:task) do |*args|
       tasks = hiiro.task_manager
+
+      runner_map = {
+        edit: ->(*sargs) { system(ENV['EDITOR'] || 'nvim', __FILE__) },
+        list: ->(*sargs) { tasks.list_trees },
+        ls: ->(*sargs) { tasks.list_trees },
+        start: ->(task_name, tree=nil) { tasks.start_task(task_name, tree:) },
+        switch: ->(task_name) { tasks.switch_task(task_name) },
+        app: ->(*sargs) { tasks.open_app(*sargs) },
+        path: ->(app_name=nil, task=nil) { tasks.app_path(app_name, task: task) },
+        cd: ->(*sargs) { tasks.cd_app(*sargs) },
+        apps: ->(*sargs) { tasks.list_configured_apps },
+        status: ->(*sargs) { tasks.status },
+        save: ->(*sargs) { tasks.save_current },
+        stop: ->(*sargs) { tasks.stop_current },
+      }
 
       case args
       in []
         tasks.help
+      in ['edit']
+        runner_map[:edit].call
       in ['list'] | ['ls']
         tasks.list_trees
       in ['start', task_name]
@@ -32,6 +49,17 @@ module Task
         tasks.status
       in ['stop']
         tasks.stop_current
+      in ['stop', task_name]
+        tasks.stop_task(task_name)
+      in [subcmd, *sargs]
+        match = runner_map.keys.find { |full_subcmd| full_subcmd.to_s.start_with?(subcmd) }
+
+        if match
+          runner_map[match].call(*sargs)
+        else
+          puts "Unknown task subcommand: #{args.inspect}"
+          tasks.help
+        end
       else
         puts "Unknown task subcommand: #{args.inspect}"
         tasks.help
@@ -58,46 +86,47 @@ module Task
       puts "Usage: h task <subcommand> [args]"
       puts
       puts "Subcommands:"
-      puts "  list, ls              List all trees and their active tasks"
-      puts "  start TASK [TREE]     Start a task (optionally specify tree)"
-      puts "  app APP_NAME          Open a tmux window for an app in current tree"
+      puts "  list, ls              List all worktrees and their active tasks"
+      puts "  start TASK            Start a task (reuses available worktree or creates new)"
+      puts "  switch TASK           Switch to an existing task"
+      puts "  app APP_NAME          Open a tmux window for an app in current worktree"
       puts "  apps                  List configured apps from apps.yml"
       puts "  save                  Save current tmux session info for this task"
       puts "  status, st            Show current task status"
-      puts "  stop                  Stop working on current task"
+      puts "  stop                  Stop working on current task (worktree becomes available)"
     end
 
-    # List all trees (worktree-like dirs) and their active tasks
+    # List all worktrees and their active tasks
     def list_trees
-      puts "Trees in ~/work/:"
+      puts "Git worktrees:"
       puts
 
-      trees.each do |tree_name|
+      if trees.empty?
+        puts "  (no worktrees found)"
+        puts
+        puts "  Start a task with 'h task start TASK_NAME' to create one."
+        return
+      end
+
+      current = current_task
+      active, available = trees.partition { |tree_name| task_for_tree(tree_name) }
+
+      active.each do |tree_name|
         task = task_for_tree(tree_name)
-        if task
-          puts format("  %-20s => %s", tree_name, task)
-        else
-          puts format("  %-20s    (available)", tree_name)
-        end
+        marker = (current && current[:tree] == tree_name) ? "*" : " "
+        puts format("%s %-20s => %s", marker, tree_name, task)
+      end
+
+      puts if active.any? && available.any?
+
+      available.each do |tree_name|
+        puts format("  %-20s    (available)", tree_name)
       end
     end
 
     # Start working on a task
     def start_task(task_name, tree: nil)
-      tree ||= find_available_tree
-
-      unless tree
-        puts "ERROR: No available trees found. All trees have active tasks."
-        puts
-        list_trees
-        return false
-      end
-
-      unless trees.include?(tree)
-        puts "ERROR: Tree '#{tree}' not found in ~/work/"
-        return false
-      end
-
+      # Check if task already exists as a worktree
       existing_tree = tree_for_task(task_name)
       if existing_tree
         puts "Task '#{task_name}' already active in tree '#{existing_tree}'"
@@ -106,19 +135,82 @@ module Task
         return true
       end
 
+      # If a specific tree was requested, verify it exists and isn't reserved
+      if tree
+        if !trees.include?(tree)
+          puts "ERROR: Worktree '#{tree}' not found"
+          return false
+        end
+        if RESERVED_WORKTREES.key?(tree)
+          puts "ERROR: Worktree '#{tree}' is reserved and cannot be used for tasks"
+          return false
+        end
+      end
+
+      # Find an available worktree to reuse, or create a new one
+      available_tree = tree || find_available_tree
+
+      if available_tree
+        # Rename the available worktree to the task name
+        old_path = tree_path(available_tree)
+        new_path = File.join(File.dirname(old_path), task_name)
+
+        if available_tree != task_name
+          puts "Renaming worktree '#{available_tree}' to '#{task_name}'..."
+          result = system('git', '-C', main_repo_path, 'worktree', 'move', old_path, new_path)
+          unless result
+            puts "ERROR: Failed to rename worktree"
+            return false
+          end
+          clear_worktree_cache
+        end
+
+        final_tree_name = task_name
+        final_tree_path = new_path
+      else
+        # No available worktree, create a new one
+        puts "Creating new worktree for '#{task_name}'..."
+        new_path = File.join(Dir.home, 'work', task_name)
+
+        # Create worktree from main branch (detached to avoid branch conflicts)
+        result = system('git', '-C', main_repo_path, 'worktree', 'add', '--detach', new_path)
+        unless result
+          puts "ERROR: Failed to create worktree"
+          return false
+        end
+        clear_worktree_cache
+
+        final_tree_name = task_name
+        final_tree_path = new_path
+      end
+
       # Associate task with tree
-      assign_task_to_tree(task_name, tree)
+      assign_task_to_tree(task_name, final_tree_name)
 
       # Create/switch to tmux session
       session_name = session_name_for(task_name)
-      tree_path = tree_path(tree)
 
-      Dir.chdir(tree_path)
+      Dir.chdir(final_tree_path)
       hiiro.start_tmux_session(session_name)
 
-      save_task_metadata(task_name, tree: tree, session: session_name)
+      save_task_metadata(task_name, tree: final_tree_name, session: session_name)
 
-      puts "Started task '#{task_name}' in tree '#{tree}'"
+      puts "Started task '#{task_name}' in worktree '#{final_tree_name}'"
+      true
+    end
+
+    # Start working on a task
+    def switch_task(task_name)
+      tree, task = assignments.find { |tree, task| task.start_with?(task_name) } || []
+
+      unless task
+        puts "No task matching #{task_name} found."
+        return false
+      end
+
+      switch_to_task(task, tree)
+
+      puts "Started task '#{task}' in tree '#{tree}'"
       true
     end
 
@@ -149,6 +241,52 @@ module Task
       in [resolved_name, app_path]
         # Create new tmux window with app directory as base
         system('tmux', 'new-window', '-n', resolved_name, '-c', app_path)
+        puts "Opened '#{resolved_name}' in new window (#{app_path})"
+        true
+      end
+    end
+
+    # Open an app window within the current tree
+    def cd_app(app_name=nil)
+      current = current_task
+      unless current
+        puts "ERROR: Not currently in a task session"
+        puts "Use 'h task start TASK_NAME' first"
+        return false
+      end
+
+      tree = current[:tree]
+
+      result = []
+      if app_name.to_s == ''
+        result = ['root', tree_path(tree)]
+      else
+        result = find_app_path(tree, app_name)
+      end
+
+      case result
+      in nil
+        puts "ERROR: App '#{app_name}' not found"
+        puts
+        list_apps(tree)
+        return false
+      in [:ambiguous, matches]
+        puts "ERROR: '#{app_name}' matches multiple apps:"
+        matches.each { |m| puts "  #{m}" }
+        puts
+        puts "Be more specific."
+        return false
+      in [resolved_name, app_path]
+        # Create new tmux window with app directory as base
+        pane = ENV['TMUX_PANE']
+        if pane
+          puts "PANE: #{pane}"
+          puts command: ['tmux', 'send-keys', '-t', pane, "cd #{app_path}\n"].join(' ')
+          system('tmux', 'send-keys', '-t', pane, "cd #{app_path}\n")
+        else
+          puts command: ['tmux', 'send-keys', "cd #{app_path}\n"].join(' ')
+          system('tmux', 'send-keys', "cd #{app_path}\n")
+        end
         puts "Opened '#{resolved_name}' in new window (#{app_path})"
         true
       end
@@ -189,7 +327,8 @@ module Task
       end
 
       puts "Current task: #{current[:task]}"
-      puts "Tree: #{current[:tree]}"
+      puts "Worktree: #{current[:tree]}"
+      puts "Path: #{tree_path(current[:tree])}"
       puts "Session: #{current[:session]}"
 
       meta = task_metadata(current[:task])
@@ -198,7 +337,7 @@ module Task
       end
     end
 
-    # Stop working on current task (disassociate from tree)
+    # Stop working on current task (disassociate from worktree)
     def stop_current
       current = current_task
       unless current
@@ -206,11 +345,21 @@ module Task
         return false
       end
 
-      task_name = current[:task]
-      tree = current[:tree]
+      stop_task(current[:task])
+    end
+
+    # Stop working on a task (disassociate from worktree)
+    def stop_task(task_name)
+      tree = tree_for_task(task_name)
+      task_name = task_for_tree(tree)
+
+      if RESERVED_WORKTREES.key?(tree)
+        puts "Cannot stop reserved task '#{task_name}'"
+        return false
+      end
 
       unassign_task_from_tree(tree)
-      puts "Stopped task '#{task_name}' (tree '#{tree}' now available)"
+      puts "Stopped task '#{task_name}' (worktree '#{tree}' now available for reuse)"
       true
     end
 
@@ -233,23 +382,92 @@ module Task
       end
     end
 
+    def app_path(app_name, task: nil)
+      tree_root = task ? tree_path(tree_for_task(task)) : `git rev-parse --show-toplevel`.strip
+
+      if app_name.nil?
+        print tree_root
+        exit 0
+      end
+
+      matching_apps = find_all_apps(app_name)
+      longest_app_name = printable_apps.keys.max_by(&:length).length + 2
+
+      case matching_apps.count
+      when 0
+        puts "ERROR: No matches found"
+        puts
+        puts "Possible Apps:"
+        puts printable_apps.keys.sort.map{|k| format("%#{longest_app_name}s => %s", k, printable_apps[k]) }
+        exit 1
+      when 1
+        print File.join(tree_root, apps_config[matching_apps.first])
+        exit 0
+      else
+        puts "Multiple matches found:"
+        puts matching_apps.sort.map{|k| format("%#{longest_app_name}s => %s", k, printable_apps[k]) }
+        exit 1
+      end
+    end
+
     private
 
-    # Find trees (dirs with .git in ~/work/)
+    def printable_apps
+      apps_config.transform_keys(&:to_s)
+    end
+
+    # Find worktrees using git worktree list
     def trees
-      pattern = File.join(Dir.home, 'work', '*', '.git')
-      Dir.glob(pattern).map { |git_path|
-        File.basename(File.dirname(git_path))
-      }.sort
+      worktree_info.keys.sort
+    end
+
+    # Parse git worktree list output into { name => path } hash
+    def worktree_info
+      @worktree_info ||= begin
+        output = `git -C #{main_repo_path} worktree list --porcelain 2>/dev/null`
+        info = {}
+        current_path = nil
+
+        output.lines.each do |line|
+          line = line.strip
+          if line.start_with?('worktree ')
+            current_path = line.sub('worktree ', '')
+          elsif line == 'bare'
+            # Skip bare repo
+            current_path = nil
+          elsif line.start_with?('branch ') || line == 'detached'
+            # Capture worktree (both named branches and detached HEAD)
+            if current_path && current_path != main_repo_path
+              name = File.basename(current_path)
+              info[name] = current_path
+            end
+            current_path = nil
+          end
+        end
+
+        info
+      end
+    end
+
+    def clear_worktree_cache
+      @worktree_info = nil
+    end
+
+    # Get the main repo path (where we run git worktree commands from)
+    def main_repo_path
+      File.join(Dir.home, 'work', '.bare')
     end
 
     def tree_path(tree_name)
-      File.join(Dir.home, 'work', tree_name)
+      worktree_info[tree_name] || File.join(Dir.home, 'work', tree_name)
     end
+
+    # Worktrees with permanent task assignments (worktree => task)
+    RESERVED_WORKTREES = { 'carrot' => 'master' }.freeze
 
     # Find an available tree (one without an active task)
     def find_available_tree
-      trees.find { |tree| task_for_tree(tree).nil? }
+      trees.find { |tree| task_for_tree(tree).nil? && !RESERVED_WORKTREES.key?(tree) }
     end
 
     # Get the task currently assigned to a tree
@@ -259,7 +477,15 @@ module Task
 
     # Get the tree a task is assigned to
     def tree_for_task(task_name)
-      assignments.find { |tree, task| task == task_name }&.first
+      assignment_for_task(task_name)&.first
+    end
+
+    def assignment_for_task(partial)
+      assignments.find { |tree, task| task.start_with?(partial) }
+    end
+
+    def find_task(partial)
+      assignments.values.find { |task| task.start_with?(partial) }
     end
 
     # Assign a task to a tree
@@ -271,7 +497,8 @@ module Task
 
     # Unassign task from tree
     def unassign_task_from_tree(tree_name)
-      data = assignments
+      return if RESERVED_WORKTREES.key?(tree_name)
+      data = assignments.dup
       data.delete(tree_name)
       save_assignments(data)
     end
@@ -282,8 +509,13 @@ module Task
     end
 
     def load_assignments
-      return {} unless File.exist?(assignments_file)
-      YAML.safe_load_file(assignments_file) || {}
+      data = if File.exist?(assignments_file)
+        YAML.safe_load_file(assignments_file) || {}
+      else
+        {}
+      end
+      # Always include reserved worktree assignments
+      RESERVED_WORKTREES.merge(data)
     end
 
     def save_assignments(data)
@@ -321,7 +553,7 @@ module Task
 
     # Session name for a task
     def session_name_for(task_name)
-      "task-#{task_name}"
+      task_name
     end
 
     # Detect current task from tmux session name
@@ -329,9 +561,8 @@ module Task
       return nil unless ENV['TMUX']
 
       session = `tmux display-message -p '#S'`.strip
-      return nil unless session.start_with?('task-')
 
-      task_name = session.sub('task-', '')
+      task_name = session
       tree = tree_for_task(task_name)
 
       return nil unless tree
