@@ -1,6 +1,26 @@
 #!/usr/bin/env ruby
 
-load File.join(Dir.home, 'bin', 'h')
+require 'hiiro'
+require 'pry'
+require 'rspec'
+
+# $> h session
+#
+#  Subcommand required!
+#
+#  Possible subcommands:
+#    pin       (subcommand)  /Users/unixsuperhero/.config/hiiro/plugins/pins.rb:12
+#    edit      (subcommand)  /Users/unixsuperhero/.rbenv/versions/3.1.2/lib/ruby/gems/3.1.0/gems/hiiro-0.1.8/lib/hiiro.rb:14
+#    ses       (subcommand)  /Users/unixsuperhero/bin/h-session:99
+#    ls        (subcommand)  /Users/unixsuperhero/bin/h-session:111
+#    new       (subcommand)  /Users/unixsuperhero/bin/h-session:115
+#    kill      (subcommand)  /Users/unixsuperhero/bin/h-session:119
+#    attach    (subcommand)  /Users/unixsuperhero/bin/h-session:123
+#    rename    (subcommand)  /Users/unixsuperhero/bin/h-session:127
+#    switch    (subcommand)  /Users/unixsuperhero/bin/h-session:131
+#    detach    (subcommand)  /Users/unixsuperhero/bin/h-session:135
+#    has       (subcommand)  /Users/unixsuperhero/bin/h-session:139
+#    info      (subcommand)  /Users/unixsuperhero/bin/h-session:143
 
 o = Hiiro.init(*ARGV, plugins: [Pins])
 
