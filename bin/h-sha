@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+BASE_DIR = File.join(Dir.home, 'work/carrot')
+
+Hiiro.init(*ARGV, plugins: [Tmux, Pins, Project]) { |hiiro|
+
+}.run
+

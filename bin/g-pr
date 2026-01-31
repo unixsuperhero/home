@@ -245,12 +245,12 @@ class PRManager
 end
 
 WATCH_BLOCK = lambda { |original_pr_number=nil, *args|
-  watch = hiiro.get_value(:watch)
-  fail_fast = hiiro.get_value(:fail_fast)
+  watch = o.get_value(:watch)
+  fail_fast = o.get_value(:fail_fast)
 
   pr_valid = false
   pr_number = nil
-  if !original_pr_number.nil? && pin_value = hiiro.pins.get(original_pr_number)
+  if !original_pr_number.nil? && pin_value = o.pins.get(original_pr_number)
     pr_valid = true
     pr_number = pin_value
   end
@@ -322,6 +322,6 @@ hiiro.add_subcmd(:current) { manager.current }
 hiiro.add_subcmd(:open) { |pr_number=nil| manager.open(pr_number) }
 hiiro.add_subcmd(:view) { |pr_number=nil| manager.view(pr_number) }
 
-# hiiro.add_default { manager.help }
+hiiro.add_default { manager.help }
 
 hiiro.run

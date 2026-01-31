@@ -1,0 +1,63 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+BASE_DIR = CONFIG_DIR = File.join(Dir.home, '.config/nvim')
+TMUX_SESSION_NAME = 'vim'
+
+o = Hiiro.init(*ARGV, plugins: [Tmux, Pins, Project])
+
+o.add_subcmd(:edit) { |*args|
+  nvim = ENV['EDITOR']
+  system(nvim, __FILE__)
+}
+
+o.add_subcmd(:path) { |*args|
+  print BASE_DIR
+}
+
+o.add_subcmd(:init, :config) { |*args|
+  nvim = ENV['EDITOR']
+
+  Dir.chdir(BASE_DIR)
+  system(nvim, 'init.lua')
+}
+
+o.add_subcmd(:skf) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('skf', *args)
+}
+
+o.add_subcmd(:rg) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', *args)
+}
+
+o.add_subcmd(:rgall) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', '--no-ignore-vcs', *args)
+}
+
+o.add_subcmd(:session) { |*args|
+  Dir.chdir(BASE_DIR)
+
+  o.switch_to_tmux_session(TMUX_SESSION_NAME)
+}
+
+# basically call :session
+o.add_subcmd(:tmux) { |*args|
+  Dir.chdir(BASE_DIR)
+
+  o.switch_to_tmux_session(TMUX_SESSION_NAME)
+}
+
+if o.runnable?
+  o.run
+else
+  puts format('ERROR: %s', :no_runnable_found)
+
+  puts
+
+  o.help
+end
+

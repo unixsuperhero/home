@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:random) { |*args|
+  puts msg: :inside_random, args: args
+}
+
+if o.runnable?
+  o.run
+else
+  puts :no_runnable_found
+end
+

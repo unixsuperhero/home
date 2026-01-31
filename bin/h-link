@@ -1,0 +1,407 @@
+#!/usr/bin/env ruby
+
+require 'yaml'
+require 'fileutils'
+require 'time'
+require 'pry'
+require 'tempfile'
+require "hiiro"
+
+class LinkManager
+  LINKS_FILE = File.join(Dir.home, '.config/hiiro/links.yml')
+  LINK_TEMPLATE = {
+    'url' => 'https://',
+    'description' => '',
+    'shorthand' => nil,
+    'created_at' => Time.now.iso8601,
+  }
+
+  class Link
+    attr_accessor :url, :description, :shorthand, :created_at
+
+    def initialize(url:, description: '', shorthand: nil, created_at: Time.now.iso8601)
+      @url = url
+      @description = description
+      @shorthand = shorthand
+      @created_at = created_at
+    end
+
+    def self.from_hash(hash)
+      new(
+        url: hash['url'],
+        description: hash['description'] || '',
+        shorthand: hash['shorthand'],
+        created_at: hash['created_at'] || Time.now.iso8601
+      )
+    end
+
+    def to_h
+      {
+        'url' => @url,
+        'description' => @description,
+        'shorthand' => @shorthand,
+        'created_at' => @created_at
+      }
+    end
+
+    def to_yaml
+      to_h.to_yaml
+    end
+
+    def matches?(*terms)
+      searchable = [
+        @url,
+        @description,
+        @shorthand
+      ].compact.join(' ').downcase
+
+      terms.all? { |term| searchable.downcase.include?(term.downcase) }
+    end
+
+    def display_string(index = nil)
+      num = index ? "#{(index + 1).to_s.rjust(3)}." : ""
+      shorthand_str = @shorthand ? " [#{@shorthand}]" : ""
+      desc_str = @description.to_s.empty? ? "" : " - #{@description}"
+      "#{num}#{shorthand_str} #{@url}#{desc_str}".strip
+    end
+  end
+
+  attr_reader :links_file
+
+  def initialize(links_file = LINKS_FILE)
+    @links_file = links_file
+  end
+
+  def ensure_links_file
+    dir = File.dirname(@links_file)
+    FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
+    File.write(@links_file, [].to_yaml) unless File.exist?(@links_file)
+  end
+
+  def hash_matches?(links_hash, *args)
+    links_hash.select { |line, link| link.matches?(*args) }
+  end
+
+  def search_links(links, *args)
+    links.select { |link| link.matches?(*args) }
+  end
+
+  def load_link_hash(links=nil)
+    links ||= load_links
+
+    links.each_with_index.each_with_object({}) do |(link, idx), h|
+      h[link.display_string(idx)] = link
+    end
+  end
+
+  def load_links
+    ensure_links_file
+    links_data = YAML.load_file(@links_file) || []
+    links_data.map { |hash| Link.from_hash(hash) }
+  end
+
+  def edit_links(links=nil)
+    links_array = if links.nil?
+      [LINK_TEMPLATE]
+    elsif links.is_a?(Array)
+      links.map { |link| link.is_a?(Link) ? link.to_h : link }
+    else
+      [links.is_a?(Link) ? links.to_h : links]
+    end
+
+    tmpfile = Tempfile.new(['link-edit-', '.yml'])
+    tmpfile.write(links_array.to_yaml)
+    tmpfile.close
+
+    system(ENV['EDITOR'] || 'vim', tmpfile.path)
+
+    updated_data = YAML.load_file(tmpfile.path)
+    tmpfile.unlink
+
+    # Handle both array and single hash results
+    updated_array = updated_data.is_a?(Array) ? updated_data : [updated_data]
+    updated_array.map { |hash| Link.from_hash(hash) }
+  end
+
+  def save_links(links)
+    ensure_links_file
+    links_data = links.map { |link| link.to_h }
+    File.write(@links_file, links_data.to_yaml)
+  end
+
+  def extract_placeholders(url)
+    url.scan(/\{(\w+)\}/).flatten
+  end
+
+  def has_placeholders?(url)
+    !extract_placeholders(url).empty?
+  end
+
+  def prompt_for_placeholder_values(url, link=nil)
+    placeholders = extract_placeholders(url)
+    return {} if placeholders.empty?
+
+    # Create a YAML template with placeholder names as keys
+    template = placeholders.each_with_object({}) { |name, hash| hash[name] = '' }
+
+    tmpfile = Tempfile.new(['link-params-', '.yml'])
+
+    # Add the link as YAML comments if provided
+    if link
+      link_yaml = link.to_yaml
+      link_yaml.each_line do |line|
+        tmpfile.puts("# #{line.chomp}")
+      end
+      tmpfile.puts("#")
+      tmpfile.puts("# Fill in placeholder values below:")
+      tmpfile.puts("#")
+    end
+
+    tmpfile.write(template.to_yaml)
+    tmpfile.close
+
+    editor = ENV['EDITOR'] || 'safe_nvim' || 'nvim'
+    system(editor, tmpfile.path)
+
+    values = YAML.load_file(tmpfile.path) || {}
+    tmpfile.unlink
+
+    values
+  end
+
+  def substitute_placeholders(url, values)
+    result = url.dup
+    values.each do |key, value|
+      # Replace spaces with + for URL encoding
+      encoded_value = value.to_s.gsub(' ', '+')
+      result.gsub!("{#{key}}", encoded_value)
+    end
+    result
+  end
+
+  def find_link_by_ref(ref, links)
+    if ref =~ /^\d+$/
+      idx = ref.to_i - 1
+      return [idx, links[idx]] if idx >= 0 && idx < links.length
+    else
+      links.each_with_index do |link, idx|
+        return [idx, link] if link.shorthand == ref
+      end
+    end
+    [nil, nil]
+  end
+end
+
+lm = LinkManager.new
+o = Hiiro.init(*ARGV, plugins: [Tmux, Pins], links_file: lm.links_file)
+
+o.add_subcmd(:add) do |*args|
+  links = lm.load_links
+
+  if args.empty?
+    new_links = lm.edit_links
+
+    links.concat(new_links)
+    lm.save_links(links)
+
+    if new_links.length == 1
+      puts "Saved link ##{links.length}: #{new_links.first.url}"
+    else
+      puts "Saved #{new_links.length} links (#{links.length - new_links.length + 1}-#{links.length})"
+    end
+    exit 0
+  end
+
+  url = args.shift
+  description = args.join(' ')
+
+  new_link = LinkManager::Link.new(
+    url: url,
+    description: description,
+    shorthand: nil,
+    created_at: Time.now.iso8601
+  )
+
+  links << new_link
+  lm.save_links(links)
+
+  puts "Saved link ##{links.length}: #{url}"
+end
+
+o.add_subcmd(:ls) do |*args|
+  links = lm.load_links
+  if links.empty?
+    puts "No links saved."
+  else
+    links.each_with_index do |link, idx|
+      puts link.display_string(idx)
+    end
+  end
+end
+
+o.add_subcmd(:list) do |*args|
+  o.run_subcmd(:ls, *args)
+end
+
+o.add_subcmd(:search) do |*args|
+  if args.empty?
+    puts "Usage: h link search <term> [term...]"
+    exit 1
+  end
+
+  links = lm.load_links
+  matches = links.each_with_index.select { |link, idx| link.matches?(*args) }
+
+  if matches.empty?
+    puts "No links found matching: #{args.join(' ')}"
+  else
+    matches.each do |link, idx|
+      puts link.display_string(idx)
+    end
+  end
+end
+
+o.add_subcmd(:select) do |*args|
+  links = lm.load_links
+
+  if links.empty?
+    STDERR.puts "No links saved."
+    exit 1
+  end
+
+  lines = lm.load_link_hash(links)
+
+  if args.any?
+    lines = lm.hash_matches?(lines, *args)
+  end
+
+  require 'open3'
+  selected, status = Open3.capture2('sk', stdin_data: lines.keys.join("\n"))
+
+  if status.success? && !selected.strip.empty?
+    link = lines[selected.strip]
+    if link
+      url = link.url
+
+      if lm.has_placeholders?(url)
+        values = lm.prompt_for_placeholder_values(url, link)
+        url = lm.substitute_placeholders(url, values)
+      end
+
+      puts url
+    end
+  end
+end
+
+o.add_subcmd(:editall) do |*args|
+  links_before = lm.load_links
+  system(ENV['EDITOR'] || 'vim', lm.links_file)
+
+  begin
+    links_after = lm.load_links
+  rescue => e
+    puts "ERROR: Unable to read updated file...reverting."
+    lm.save_links(links_before)
+  end
+end
+
+o.add_subcmd(:edit) do |*args|
+  if args.empty?
+    puts "Usage: h link edit <number|shorthand>"
+    exit 1
+  end
+
+  links = lm.load_links
+  idx, link = lm.find_link_by_ref(args.first, links)
+
+  if link.nil?
+    puts "Link not found: #{args.first}"
+    exit 1
+  end
+
+  updated_links = lm.edit_links(link)
+
+  # Replace the original link with the first updated link
+  # If multiple links were added, insert them all
+  links[idx] = updated_links.first
+  if updated_links.length > 1
+    links.insert(idx + 1, *updated_links[1..-1])
+  end
+
+  lm.save_links(links)
+
+  if updated_links.length == 1
+    puts "Updated link ##{idx + 1}"
+  else
+    puts "Updated link ##{idx + 1} and added #{updated_links.length - 1} more"
+  end
+end
+
+o.add_subcmd(:open) do |*args|
+  links = lm.load_links
+
+  if args.empty?
+    lines = lm.load_link_hash(links)
+
+    exit_code = 1
+
+    if args.any?
+      lines = lm.hash_matches?(lines, *args)
+    end
+
+    require 'open3'
+    selected, status = Open3.capture2('sk', stdin_data: lines.keys.join("\n"))
+
+    if status.success? && !selected.strip.empty?
+      link = lines[selected.strip]
+      if link
+        url = link.url
+
+        if lm.has_placeholders?(url)
+          values = lm.prompt_for_placeholder_values(url, link)
+          url = lm.substitute_placeholders(url, values)
+        end
+
+        system('open', url)
+        exit_code = 0
+      end
+    end
+
+    exit exit_code
+  end
+
+  idx, link = lm.find_link_by_ref(args.first, links)
+
+  if link.nil?
+    matches = lm.search_links(links, *args)
+
+    if matches.count == 1
+      link = matches.first
+    end
+  end
+
+  if link.nil?
+    puts "Link not found: #{args.first}"
+    exit 1
+  end
+
+  url = link.url
+
+  if lm.has_placeholders?(url)
+    values = lm.prompt_for_placeholder_values(url, link)
+    url = lm.substitute_placeholders(url, values)
+  end
+
+  system('open', url)
+end
+
+o.add_subcmd(:path) do |*args|
+  print lm.links_file
+end
+
+begin
+  o.run
+rescue => e
+  require 'pry'
+  binding.pry
+end

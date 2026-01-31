@@ -1,0 +1,173 @@
+#!/usr/bin/env ruby
+
+require "hiiro"
+
+o = Hiiro.init(*ARGV)
+
+# Helper to start or attach to a tmux session
+def start_tmux_session(session_name)
+  session_name = session_name.to_s
+
+  unless system('tmux', 'has-session', '-t', session_name)
+    system('tmux', 'new', '-d', '-A', '-s', session_name)
+  end
+
+  if ENV['TMUX']
+    system('tmux', 'switchc', '-t', session_name)
+  elsif ENV['NVIM']
+    puts "Can't attach to tmux inside a vim terminal"
+  else
+    system('tmux', 'new', '-A', '-s', session_name)
+  end
+end
+
+# Get project directories from ~/proj/
+def project_dirs
+  Dir.glob(File.join(Dir.home, 'proj', '*/')).map { |path|
+    [File.basename(path), path]
+  }.to_h
+end
+
+# Get projects from config file
+def projects_from_config
+  projects_file = File.join(Dir.home, '.config/hiiro', 'projects.yml')
+
+  return {} unless File.exist?(projects_file)
+
+  require 'yaml'
+  YAML.safe_load_file(projects_file)
+end
+
+# === OPEN PROJECT (default) ===
+
+o.add_subcmd(:open) { |project_name|
+  re = /#{project_name}/i
+
+  conf_matches = (projects_from_config || {}).select { |k, v| k.match?(re) }
+  dir_matches = (project_dirs || {}).select { |proj, path| proj.match?(re) }
+
+  matches = dir_matches.merge(conf_matches)
+  if matches.count > 1
+    matches = matches.select { |name, path| name == project_name }
+  end
+
+  case matches.count
+  when 0
+    name = 'proj'
+    path = File.join(Dir.home, 'proj')
+
+    unless Dir.exist?(path)
+      puts "Error: #{path.inspect} does not exist"
+      exit 1
+    end
+
+    puts "changing dir: #{path}"
+    Dir.chdir(path)
+
+    start_tmux_session(name)
+  when 1
+    name, path = matches.first
+
+    puts "changing dir: #{path}"
+    Dir.chdir(path)
+
+    start_tmux_session(name)
+  when (2..)
+    puts "ERROR: Multiple matches found"
+    puts
+    puts "Matches:"
+    matches.each { |name, path|
+      puts format("  %s: %s", name, path)
+    }
+  end
+}
+
+# === LIST PROJECTS ===
+
+o.add_subcmd(:list) { |*args|
+  dirs = project_dirs
+  conf = projects_from_config
+
+  all_projects = dirs.merge(conf)
+
+  puts "Projects:"
+  puts
+  all_projects.keys.sort.each do |name|
+    path = all_projects[name]
+    source = conf.key?(name) ? '[config]' : '[dir]'
+    puts format("  %-12s %-8s %s", name, source, path)
+  end
+}
+
+o.add_subcmd(:ls) { |*args|
+  o.run_subcmd(:list, *args)
+}
+
+# === SHOW CONFIG FILE ===
+
+o.add_subcmd(:config) { |*args|
+  projects_file = File.join(Dir.home, '.config/hiiro', 'projects.yml')
+
+  if File.exist?(projects_file)
+    puts File.read(projects_file)
+  else
+    puts "No config file found at: #{projects_file}"
+    puts
+    puts "Create it with YAML format:"
+    puts "  project_name: /path/to/project"
+  end
+}
+
+# === EDIT CONFIG FILE ===
+
+o.add_subcmd(:edit) { |*args|
+  projects_file = File.join(Dir.home, '.config/hiiro', 'projects.yml')
+  editor = ENV['EDITOR'] || 'vim'
+
+  # Create config dir if needed
+  config_dir = File.dirname(projects_file)
+  Dir.mkdir(config_dir) unless Dir.exist?(config_dir)
+
+  # Create empty file if it doesn't exist
+  unless File.exist?(projects_file)
+    File.write(projects_file, "# Project aliases\n# project_name: /path/to/project\n")
+  end
+
+  exec(editor, projects_file)
+}
+
+# === HELP ===
+
+o.add_subcmd(:help) { |*args|
+  puts <<~HELP
+    h-project - Project directory and tmux session manager
+
+    USAGE:
+      h-project <project_name>        Open project (fuzzy match) and start tmux session
+      h-project open <project_name>   Same as above
+      h-project list                  List all known projects
+      h-project ls                    Alias for list
+      h-project config                Show config file contents
+      h-project edit                  Edit config file
+
+    SOURCES:
+      Projects are discovered from two sources:
+      1. Directories in ~/proj/
+      2. Entries in ~/.config/hiiro/projects.yml
+
+    CONFIG FORMAT (projects.yml):
+      project_name: /path/to/project
+      another: /some/other/path
+
+    MATCHING:
+      Project names are matched using regex (case insensitive).
+      If multiple matches are found, an exact match is preferred.
+      If still ambiguous, all matches are displayed.
+  HELP
+}
+
+if o.runnable?
+  o.run
+else
+  o.run_subcmd(:help)
+end

@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+Hiiro.init(*ARGV) { |h|
+  h.add_subcmd(:uid) { |*| system("echo 15384586981458532|pbcopy"); print 15384586981458532; }
+  h.add_subcmd(:email) { |*| system("echo joshua.toyota@instacart.com|pbcopy"); print 'joshua.toyota@instacart.com'; }
+}.run
+

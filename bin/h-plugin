@@ -2,7 +2,7 @@
 
 require 'json'
 
-load File.join(Dir.home, 'bin', 'h')
+require 'hiiro'
 
 BASE_DIR = File.join(Dir.home, '.config/hiiro/plugins')
 o = Hiiro.init(*ARGV, plugins: [Tmux, Pins], dir: BASE_DIR)

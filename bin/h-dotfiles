@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+EDITOR = ENV.fetch('EDITOR', 'nvim')
+BASE_DIR = File.join(Dir.home, 'proj', 'home')
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:edit) { |*args|
+  system(EDITOR, __FILE__)
+}
+
+o.add_subcmd(:path) { |*args|
+  print BASE_DIR
+}
+
+o.add_subcmd(:skf) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('skf', *args)
+}
+
+o.add_subcmd(:rg) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', *args)
+}
+
+o.add_subcmd(:rgall) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', '--no-ignore-vcs', *args)
+}
+
+o.add_subcmd(:ebin) { |*args|
+  system(EDITOR, *args)
+}
+
+if o.runnable?
+  o.run
+else
+  puts :no_runnable_found
+end
+

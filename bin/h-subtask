@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+
+# Shorthand for `h task subtask`
+
+require "hiiro"
+require "fileutils"
+require "yaml"
+require "time"
+
+Hiiro.load_env
+hiiro = Hiiro.init(*ARGV, plugins: [Tmux, Task])
+
+tasks = hiiro.task_manager
+
+hiiro.add_subcmd(:edit) { system(ENV['EDITOR'] || 'nvim', __FILE__) }
+hiiro.add_subcmd(:ls) { tasks.list_subtasks }
+hiiro.add_subcmd(:new) { |subtask_name| tasks.new_subtask(subtask_name) }
+hiiro.add_subcmd(:switch) { |subtask_name| tasks.switch_subtask(subtask_name) }
+
+# hiiro.add_default { tasks.subtask_help }
+
+hiiro.run

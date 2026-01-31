@@ -1,45 +1,78 @@
 #!/usr/bin/env ruby
 
-require 'hiiro'
+require "hiiro"
+require "open3"
+require "pathname"
+require "tmpdir"
 
-o = Hiiro.init(*ARGV)
+hiiro = Hiiro.init(*ARGV)
 
-o.add_subcmd(:new) { |*args|
-  root_dir = File.join(Dir.home, 'notes')
-
-  unless Dir.exist?(root_dir)
-    Dir.mkdir(root_dir)
+# Helper class for directory operations
+class Directory
+  # Temporarily change to a directory, run block, then change back
+  def self.temp_cd(dir, &block)
+    original_dir = Dir.pwd
+    Dir.chdir(dir)
+    yield
+  ensure
+    Dir.chdir(original_dir)
   end
 
-  Directory.temp_cd(root_dir) {
+  # Print directory tree with indentation
+  def self.dir_tree(dir, prefix = "", base_dir = nil)
+    base_dir ||= dir
+    entries = Dir.entries(dir).reject { |e| e.start_with?('.') }.sort
+
+    entries.each do |entry|
+      path = File.join(dir, entry)
+      relative_path = Pathname.new(path).relative_path_from(base_dir)
+
+      if File.directory?(path)
+        puts "#{prefix}#{entry}/"
+        dir_tree(path, prefix + "  ", base_dir)
+      else
+        puts "#{prefix}#{relative_path}"
+      end
+    end
+  end
+end
+
+notes_dir = ENV['NOTES_DIR'] || File.join(Dir.home, 'notes')
+
+hiiro.add_subcmd(:edit) { |*args|
+  system(ENV['EDITOR'] || 'nvim', __FILE__)
+}
+
+hiiro.add_subcmd(:new) { |*args|
+  unless Dir.exist?(notes_dir)
+    Dir.mkdir(notes_dir)
+  end
+
+  Directory.temp_cd(notes_dir) {
     system(ENV['EDITOR'] || 'vim', '-O', *args)
   }
 }
 
-o.add_subcmd(:categories) { |*args|
-  root_dir = File.join(Dir.home, 'notes')
-
-  unless Dir.exist?(root_dir)
-    Dir.mkdir(root_dir)
+hiiro.add_subcmd(:categories) { |*args|
+  unless Dir.exist?(notes_dir)
+    Dir.mkdir(notes_dir)
   end
 
-  Directory.temp_cd(root_dir) {
-    Directory.dir_tree(root_dir)
+  Directory.temp_cd(notes_dir) {
+    Directory.dir_tree(notes_dir)
   }
 }
 
-o.add_subcmd(:tagged_files) { |*args|
-  root_dir = File.join(Dir.home, 'notes')
-
-  unless Dir.exist?(root_dir)
-    Dir.mkdir(root_dir)
+hiiro.add_subcmd(:tagged_files) { |*args|
+  unless Dir.exist?(notes_dir)
+    Dir.mkdir(notes_dir)
   end
 
-  Directory.temp_cd(root_dir) {
+  Directory.temp_cd(notes_dir) {
     args.each do |tag|
       tag = tag.sub(/^#+/, '')
       tag_pattern = format('#%s\\b', tag)
-      cmd = format('rg -S %s %s', tag_pattern.inspect, root_dir)
+      cmd = format('rg -S %s %s', tag_pattern.inspect, notes_dir)
       out, err, status = Open3.capture3(cmd)
 
       if status.success?
@@ -47,7 +80,7 @@ o.add_subcmd(:tagged_files) { |*args|
         puts format('#%s', tag).gsub(/./, ?-)
         out.lines.each do |line|
           file = line.sub(/:.*/, '')
-          puts Pathname.new(file).relative_path_from(root_dir)
+          puts Pathname.new(file).relative_path_from(notes_dir)
         end
       end
 
@@ -56,29 +89,31 @@ o.add_subcmd(:tagged_files) { |*args|
   }
 }
 
-o.add_subcmd(:tags) { |*args|
-  root_dir = File.join(Dir.home, 'notes')
-
-  unless Dir.exist?(root_dir)
-    Dir.mkdir(root_dir)
+hiiro.add_subcmd(:ls) { |*args|
+  unless Dir.exist?(notes_dir)
+    Dir.mkdir(notes_dir)
   end
 
-  Directory.temp_cd(root_dir) {
+  Directory.temp_cd(notes_dir) {
+    Dir.glob('**/*').each(&method(:puts))
+  }
+}
+
+hiiro.add_subcmd(:tags) { |*args|
+  unless Dir.exist?(notes_dir)
+    Dir.mkdir(notes_dir)
+  end
+
+  Directory.temp_cd(notes_dir) {
     tag_pattern = '#[^#[:space:]]+'
-    cmd = format('rg -SI %s %s', tag_pattern.inspect, root_dir)
+    cmd = format('rg -SI %s %s', tag_pattern.inspect, notes_dir)
     out, err, status = Open3.capture3(cmd)
 
     if status.success?
       puts out.scan(Regexp.new(tag_pattern)).sort.uniq
     end
-
-    binding.pry
   }
 }
 
-if o.runnable?
-  o.run
-else
-  puts :no_runnable_found
-end
+hiiro.run
 

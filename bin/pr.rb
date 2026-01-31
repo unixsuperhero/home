@@ -63,6 +63,10 @@ class Pr
     }
   end
 
+  def ready_for_review?
+    is_draft && mergeable == "MERGEABLE" && merge_state_status == "BLOCKED"
+  end
+
   def diff(old_pr)
     new_values = to_h
     old_values = old_pr.to_h

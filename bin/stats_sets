@@ -1,0 +1,131 @@
+#!/usr/bin/env ruby
+
+require 'set'
+
+class FileSet
+  attr_reader :set
+
+  def initialize(files)
+    @set = Set.new(files)
+  end
+
+  def glob_a?
+    set.any? { |item|
+      item.match?(/[.]rb$/i)
+    }
+  end
+
+  def glob_b?
+    set.any? { |item|
+      item.match?(/_spec/i)
+    }
+  end
+
+  def glob_c?
+    set.any? { |item|
+      item.match?(/_spec.*[.]rb$/i)
+    }
+  end
+
+  def glob_d?
+    set.any? { |item|
+      item.match?(/[.]py$/i)
+    }
+  end
+end
+
+class Perms
+  attr_reader :sets
+
+  def initialize(sets)
+    @sets = sets
+  end
+
+  def perms
+    @perms ||= sets.keys.permutation(2).to_a
+  end
+
+  def unions
+    @unions ||= perms.inject({}) do |memo, ks|
+      perm_sets = ks.map { |k| sets[k] }
+      memo.merge(ks => perm_sets.inject(:union))
+    end
+  end
+
+  def intersections
+    @intersections ||= perms.inject({}) do |memo, ks|
+      perm_sets = ks.map { |k| sets[k] }
+      memo.merge(ks => perm_sets.inject(:intersection))
+    end
+  end
+
+  def diffs
+    @diffs ||= perms.inject({}) do |memo, ks|
+      perm_sets = ks.map { |k| sets[k] }
+      memo.merge(ks => perm_sets.inject(:difference))
+    end
+  end
+end
+
+def tmp_path(name) = File.join(Dir.home, 'work', 'tmp', name)
+
+idx = ARGV.shift
+pattern = ARGV.shift
+if ARGV.first == 'regexes'
+  match_path = tmp_path format('%03d.001.rg-results.00', idx.to_i)
+  path = tmp_path format('%03d.001.rg-results.01', idx.to_i)
+  match_count = IO.readlines(match_path, chomp: true).count
+  file_list = IO.readlines(path, chomp: true)
+  file_set = FileSet.new(file_list)
+
+  puts format(' matches/files: %d / %d', match_count, file_set.set.size)
+  puts format('  %-12s: %s', '/*.rb/', file_set.glob_a?)
+  puts format('  %-12s: %s', '/*.py/', file_set.glob_d?)
+  puts format('  %-12s: %s', '/*_spec*/', file_set.glob_b?)
+  puts format('  %-12s: %s', '/*_spec*.rb/', file_set.glob_c?)
+  puts
+else
+  sets = {
+    '001' => IO.readlines(tmp_path('001.001.rg-results.01'), chomp: true).to_set,
+    '002' => IO.readlines(tmp_path('002.001.rg-results.01'), chomp: true).to_set,
+    '003' => IO.readlines(tmp_path('003.001.rg-results.01'), chomp: true).to_set,
+    '004' => IO.readlines(tmp_path('004.001.rg-results.01'), chomp: true).to_set,
+    '005' => IO.readlines(tmp_path('005.001.rg-results.01'), chomp: true).to_set,
+    '006' => IO.readlines(tmp_path('006.001.rg-results.01'), chomp: true).to_set,
+    '007' => IO.readlines(tmp_path('007.001.rg-results.01'), chomp: true).to_set,
+    '008' => IO.readlines(tmp_path('008.001.rg-results.01'), chomp: true).to_set,
+    '009' => IO.readlines(tmp_path('009.001.rg-results.01'), chomp: true).to_set,
+    '010' => IO.readlines(tmp_path('010.001.rg-results.01'), chomp: true).to_set,
+    '011' => IO.readlines(tmp_path('011.001.rg-results.01'), chomp: true).to_set,
+    # ['*_spec*'] => IO.readlines(tmp_path('002.rg-results.01'), chomp: true).to_set,
+  }
+  patterns = {
+    '001' => '::StoreConfiguration::',
+    '002' => 'Domain::Constants::StoreConfiguration::',
+    '003' => '::StoreConfigurationGroups::',
+    '004' => 'Domain::Constants::StoreConfigurationGroups::',
+    '005' => '::StoreConfiguration::Instacart',
+    '006' => 'Domain::Constants::StoreConfiguration::Instacart',
+    '007' => '[^:]publix\b',
+    '008' => '::publix',
+    '009' => '::publix\b',
+    '010' => 'Domain::Constants::StoreConfiguration::(?!Instacart)\w\w*',
+    '011' => 'Domain::Constants::StoreConfiguration::Publix\b',
+    # ['*_spec*'] => IO.readlines(tmp_path('002.rg-results.01'), chomp: true).to_set,
+  }
+
+  pms = Perms.new(sets)
+
+  pms.perms.each do |ks|
+    l, r = ks
+    lsize = pms.sets[l].size
+    rsize = pms.sets[r].size
+    puts format('  %s %-7s => %s', l, format('(%d)', lsize), patterns[l])
+    puts format('  %s %-7s => %s', r, format('(%d)', rsize), patterns[r])
+    puts format('  %s | %s   => %d', l, r, pms.unions[ks].size)
+    puts format('  %s & %s   => %d', l, r, pms.intersections[ks].size)
+    puts format('  %s - %s   => %d', l, r, pms.diffs[ks].size)
+    puts
+  end
+end
+

@@ -1,0 +1,90 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+EDITOR = ENV.fetch('EDITOR', 'safe_nvim')
+BASE_DIR = File.join(Dir.home, 'work')
+TMP_DIR = File.join(Dir.home, 'work', 'carrot', 'tmp')
+NOTES_DIR = ENV['NOTES_DIR'] || File.join(Dir.home, 'notes')
+
+o = Hiiro.init(*ARGV, plugins: [Tmux, Pins])
+
+o.add_subcmd(:project) { |*args|
+  Dir.chdir(BASE_DIR)
+  dir = args.first
+
+  if dir
+    cd_dirs = Dir.glob(File.join(BASE_DIR, "#{dir}*/"))
+
+    if cd_dirs.count == 0
+      puts "No matches found"
+      exit 1
+    end
+
+    if cd_dirs.count > 1
+      puts "cd_dirs has multiple matches:"
+      puts cd_dirs
+    end
+
+    cd_dir = cd_dirs.first
+    Dir.chdir(cd_dir)
+    o.start_tmux_session(cd_dir)
+  end
+}
+
+o.add_subcmd(:session) { |*args|
+  Dir.chdir(BASE_DIR)
+
+  o.start_tmux_session('work')
+}
+
+o.add_subcmd(:edit) { |*args|
+  system(EDITOR, __FILE__)
+}
+
+o.add_subcmd(:path) { |*args|
+  print BASE_DIR
+}
+
+o.add_subcmd(:rg) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', *args)
+}
+
+o.add_subcmd(:rgall) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', '--no-ignore-vcs', *args)
+}
+
+o.add_subcmd(:scratch) { |*args|
+  unless Dir.exist?(NOTES_DIR)
+    Dir.mkdir(NOTES_DIR)
+  end
+
+  Directory.temp_cd(NOTES_DIR) {
+    system(EDITOR, '-O', 'scratch')
+  }
+}
+
+o.add_subcmd(:todo) { |*args|
+  Dir.mkdir(TMP_DIR) unless Dir.exist?(TMP_DIR)
+
+  Directory.temp_cd(TMP_DIR) {
+    system(EDITOR, '-O', 'todo', *args)
+  }
+}
+
+o.add_subcmd(:notes) { |*args|
+  unless Dir.exist?(NOTES_DIR)
+    Dir.mkdir(NOTES_DIR)
+  end
+
+  Directory.temp_cd(NOTES_DIR) {
+    system(EDITOR, '-O', *args)
+  }
+}
+
+Dir.chdir(BASE_DIR)
+
+o.run
+

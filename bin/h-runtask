@@ -1,0 +1,79 @@
+#!/bin/bash
+
+stamp="$(date +"%Y%m%d%H%M%S")"
+logfile="tmp/run-task.$stamp"
+task_logfile="tmp/run-task.status.$stamp"
+# task_name="generate-sso-config.retailers-domain.customers-backend.customers"
+task_name="generate-sso-config.partners-domain.customers-backend.customers"
+full_sha="$(git log -1 | head -1 | sed 's/commit //;s/[[:space:]].*//')"
+sha="$(echo -n "$full_sha" | sed 's/\(.......\).*/\1/')"
+trusted=${2:-false}
+method_choice=${1:-id}
+
+if test $method_choice = "id"
+then
+  trusted=false
+  SSO_CONFIG="{\"retailer_name\":\"Joshtestidtoken\",\"method_choice\":\"id_token\",\"client_id\":\"updated client id\",\"popup\":true,\"trusted\":${trusted},\"scope\":\"default\",\"activation_status\":\"active\",\"store_config_id\":1459,\"code_challenge_method\":\"S256\",\"user_info_mapping\":{\"provider_uid\":\"sub\",\"first_name\":\"user_first_name\",\"last_name\":\"user_last_name\",\"email\":\"email\",\"phone\":\"default\",\"membership_number\":\"rewards_number\"},\"token_endpoint\":\"http://example.com/token\",\"authorization_endpoint\":\"http://example.com/authorization\",\"logout_endpoint\":\"http://example.com/logout\"}"
+else
+  SSO_CONFIG="{\"retailer_name\":\"Joshuitest\",\"method_choice\":\"userinfo endpoint\",\"client_id\":\"updated client id\",\"popup\":true,\"trusted\":${trusted},\"scope\":\"default\",\"activation_status\":\"active\",\"store_config_id\":1459,\"code_challenge_method\":\"S256\",\"user_info_mapping\":{\"provider_uid\":\"sub\",\"first_name\":\"user_first_name\",\"last_name\":\"user_last_name\",\"email\":\"email\",\"phone\":\"default\",\"membership_number\":\"rewards_number\"},\"token_endpoint\":\"http://example.com/token\",\"authorization_endpoint\":\"http://example.com/authorization\",\"logout_endpoint\":\"http://example.com/logout\",\"user_info_endpoint\":\"http://example.com/user_info\"}"
+fi
+
+echo "stamp: $stamp"
+echo "logfile: $logfile"
+echo "task_name: $task_name"
+echo "full_sha: $full_sha"
+echo "sha: $sha"
+echo "trusted: $trusted"
+echo "method_choice: $method_choice"
+echo "SSO_CONFIG: $SSO_CONFIG"
+echo
+echo "$SSO_CONFIG" | jq
+
+mkdir -pv tmp
+
+if test -f tmp/run-task
+then
+  mv -v tmp/run-task "$logfile"
+fi
+
+if ! test -f $logfile
+then
+  isc task -e production run $task_name $full_sha --command 'bundle exec rake partners_domain:sso_config:generate' --conf "SSO_CONFIG=${SSO_CONFIG}" | tee $logfile
+fi
+
+uuid="$(egrep -o '\b[0-9a-f-]{36}\b' $logfile | head -1)"
+
+
+echo
+echo "UUID: $uuid"
+echo
+
+while true
+do
+  sleep 5
+  clear
+  isc -e production task runs "$task_name" "$uuid" | tee $task_logfile
+  echo
+  egrep 'Status: (pending|in-progress)' $task_logfile || break
+done
+
+log_url="$(egrep -o 'Datadog Logs:.*' $task_logfile | sed 's/Datadog Logs: //')"
+
+if [[ ! -z $log_url ]]
+then
+  open "$log_url"
+fi
+
+if egrep 'Status: failed' $task_logfile
+then
+  say "task failed"
+else
+  if egrep 'Status: succe' $task_logfile
+  then
+    say "task successful"
+  fi
+fi
+
+echo
+rm -v $logfile $task_logfile
+

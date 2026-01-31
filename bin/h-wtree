@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+Hiiro.run(*ARGV) do |h|
+  h.add_subcmd(:ls)  { |*args| system('git', 'worktree', 'list', *args) }
+  h.add_subcmd(:list)  { |*args| h.run_subcmd(:ls, *args) }
+  h.add_subcmd(:add)  { |*args| system('git', 'worktree', 'add', *args) }
+  h.add_subcmd(:lock)  { |*args| system('git', 'worktree', 'lock', *args) }
+  h.add_subcmd(:move)  { |*args| system('git', 'worktree', 'move', *args) }
+  h.add_subcmd(:prune)  { |*args| system('git', 'worktree', 'prune', *args) }
+  h.add_subcmd(:remove)  { |*args| system('git', 'worktree', 'remove', *args) }
+  h.add_subcmd(:repair)  { |*args| system('git', 'worktree', 'repair', *args) }
+  h.add_subcmd(:unlock)  { |*args| system('git', 'worktree', 'unlock', *args) }
+end
+

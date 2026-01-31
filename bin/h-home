@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+EDITOR = ENV.fetch('EDITOR', 'nvim')
+BASE_DIR = Dir.home
+
+o = Hiiro.init(*ARGV)
+
+o.add_subcmd(:edit) { |*args|
+  system(EDITOR, __FILE__)
+}
+
+o.add_subcmd(:path) { |*args|
+  print BASE_DIR
+}
+
+o.add_subcmd(:skf) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('skf', *args)
+}
+
+o.add_subcmd(:rg) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', *args)
+}
+
+o.add_subcmd(:rgall) { |*args|
+  Dir.chdir(BASE_DIR)
+  system('rg', '-S', '--no-ignore-vcs', *args)
+}
+
+o.add_subcmd(:ebin) { |*args|
+  Dir.chdir(File.join(Dir.home, 'bin'))
+
+  glob_patterns = []
+  globs = []
+
+  files = args.filter_map { |arg|
+    matches = 
+      if arg.end_with?('*')
+        glob_patterns << arg
+        Dir.glob(arg)
+      elsif arg.is_a?(String)
+        glob_patterns << '*' + arg.to_s + '*'
+        Dir.glob('*' + arg.to_s + '*')
+      end
+
+    globs << matches
+    
+    matches unless matches.empty?
+  }.flatten
+
+  system(EDITOR, *files.flatten)
+}
+
+if o.runnable?
+  o.run
+else
+  puts :no_runnable_found
+end
+

@@ -1,6 +1,19 @@
 #!/bin/bash
 
-for file in "$@"
-do
-  echo "$file" | sed 's/app\//spec\//;s/\.rb$/_spec.rb/'
-done
+if test $# -eq 0; then
+  while read file
+  do
+    if [[ "$file" == *".rb" && "$file" != *"_spec.rb" ]]
+    then
+      echo "$file" | sed 's/app\//spec\//;s/[.]rb$/_spec.rb/'
+    fi
+  done
+else
+  for arg in "$@"
+  do
+    if [[ "$arg" == *".rb" && "$arg" != *"_spec.rb" ]]
+    then
+      echo "$arg" | sed 's/app\//spec\//;s/[.]rb$/_spec.rb/'
+    fi
+  done
+fi

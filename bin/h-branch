@@ -1,0 +1,231 @@
+#!/usr/bin/env ruby
+
+require "hiiro"
+require "fileutils"
+require "yaml"
+
+Hiiro.load_env
+hiiro = Hiiro.init(*ARGV, plugins: [Task])
+
+class BranchManager
+  attr_reader :hiiro
+
+  def initialize(hiiro)
+    @hiiro = hiiro
+  end
+
+  def help
+    puts "Usage: h branch <subcommand> [args]"
+    puts
+    puts "Subcommands:"
+    puts "  save                  Record current branch for this task"
+    puts "  history               List branch history (oldest to newest)"
+    puts "  history --worktree=X  Filter by worktree"
+    puts "  history --task=X      Filter by task"
+    puts "  history --session=X   Filter by tmux session"
+    puts "  current               Show current branch info"
+  end
+
+  def save
+    branch_name = current_branch
+    unless branch_name
+      puts "ERROR: Not in a git repository"
+      return false
+    end
+
+    entry = build_entry(branch_name)
+    unless entry[:task]
+      puts "WARNING: Not in a task session, saving without task info"
+    end
+
+    data = load_data
+    data['branches'] ||= []
+
+    # Check if this branch is already recorded for this task
+    existing = data['branches'].find do |b|
+      b['name'] == branch_name && b['task'] == entry[:task]
+    end
+
+    if existing
+      # Update existing entry
+      existing.merge!(entry.transform_keys(&:to_s))
+      existing['updated_at'] = Time.now.iso8601
+      puts "Updated branch '#{branch_name}' for task '#{entry[:task]}'"
+    else
+      # Add new entry
+      data['branches'] << entry.transform_keys(&:to_s).merge('created_at' => Time.now.iso8601)
+      puts "Saved branch '#{branch_name}' for task '#{entry[:task]}'"
+    end
+
+    save_data(data)
+    show_entry(entry)
+    true
+  end
+
+  def history(args = [])
+    filters = parse_filters(args)
+    data = load_data
+    branches = data['branches'] || []
+
+    if branches.empty?
+      puts "No branches recorded."
+      puts "Use 'h branch save' to record the current branch."
+      return
+    end
+
+    # Apply filters
+    branches = filter_entries(branches, filters)
+
+    if branches.empty?
+      puts "No branches match the given filters."
+      return
+    end
+
+    # Sort by created_at (oldest first)
+    branches = branches.sort_by { |b| b['created_at'] || '' }
+
+    puts "Branch history (oldest to newest):"
+    puts
+    branches.each_with_index do |branch, idx|
+      puts format_entry(branch, idx + 1)
+    end
+  end
+
+  def current
+    branch_name = current_branch
+    unless branch_name
+      puts "ERROR: Not in a git repository"
+      return false
+    end
+
+    entry = build_entry(branch_name)
+    puts "Current branch info:"
+    puts
+    show_entry(entry)
+  end
+
+  private
+
+  def current_branch
+    branch = `git rev-parse --abbrev-ref HEAD 2>/dev/null`.strip
+    branch.empty? ? nil : branch
+  end
+
+  def build_entry(branch_name)
+    task_info = hiiro.task_manager.send(:current_task)
+    tmux_info = capture_tmux_info
+
+    {
+      name: branch_name,
+      worktree: task_info&.[](:tree),
+      task: task_info&.[](:task),
+      tmux: tmux_info
+    }
+  end
+
+  def capture_tmux_info
+    return nil unless ENV['TMUX']
+
+    {
+      'session' => `tmux display-message -p '#S'`.strip,
+      'window' => `tmux display-message -p '#W'`.strip,
+      'pane' => ENV['TMUX_PANE']
+    }
+  end
+
+  def parse_filters(args)
+    filters = {}
+    args.each do |arg|
+      case arg
+      when /^--worktree=(.+)$/
+        filters[:worktree] = $1
+      when /^--task=(.+)$/
+        filters[:task] = $1
+      when /^--session=(.+)$/
+        filters[:session] = $1
+      when /^-w(.+)$/
+        filters[:worktree] = $1
+      when /^-t(.+)$/
+        filters[:task] = $1
+      when /^-s(.+)$/
+        filters[:session] = $1
+      end
+    end
+    filters
+  end
+
+  def filter_entries(entries, filters)
+    entries.select do |entry|
+      next false if filters[:worktree] && !entry['worktree']&.include?(filters[:worktree])
+      next false if filters[:task] && !entry['task']&.include?(filters[:task])
+      next false if filters[:session] && entry.dig('tmux', 'session') != filters[:session]
+      true
+    end
+  end
+
+  def format_entry(entry, num)
+    lines = []
+    lines << "#{num}. #{entry['name']}"
+    lines << "   Task: #{entry['task'] || '(none)'}"
+    lines << "   Worktree: #{entry['worktree'] || '(none)'}"
+    if entry['tmux']
+      lines << "   Tmux: #{entry['tmux']['session']}/#{entry['tmux']['window']}"
+    end
+    lines << "   Created: #{entry['created_at']}"
+    lines.join("\n")
+  end
+
+  def show_entry(entry)
+    puts "  Branch: #{entry[:name]}"
+    puts "  Task: #{entry[:task] || '(none)'}"
+    puts "  Worktree: #{entry[:worktree] || '(none)'}"
+    if entry[:tmux]
+      puts "  Tmux session: #{entry[:tmux]['session']}"
+      puts "  Tmux window: #{entry[:tmux]['window']}"
+      puts "  Tmux pane: #{entry[:tmux]['pane']}"
+    end
+  end
+
+  def data_file
+    File.join(Dir.home, '.config', 'hiiro', 'branches.yml')
+  end
+
+  def load_data
+    return {} unless File.exist?(data_file)
+    YAML.safe_load_file(data_file) || {}
+  end
+
+  def save_data(data)
+    FileUtils.mkdir_p(File.dirname(data_file))
+    File.write(data_file, YAML.dump(data))
+  end
+end
+
+manager = BranchManager.new(hiiro)
+
+hiiro.add_subcmd(:edit) { system(ENV['EDITOR'] || 'nvim', __FILE__) }
+hiiro.add_subcmd(:save) { manager.save }
+hiiro.add_subcmd(:history) { |*args| manager.history(args) }
+hiiro.add_subcmd(:current) { manager.current }
+hiiro.add_subcmd(:select) do |*args|
+  branches = `git branch -i --sort=authordate`.lines(chomp: true)
+
+  lines = branches.each_with_object({}) do |ln,h|
+    h[ln] = ln.sub(/../, '')
+  end
+
+  if args.any?
+    lines = hash_matches?(lines, *args)
+  end
+
+  require 'open3'
+  selected, status = Open3.capture2('sk', '--no-sort', '--tac', stdin_data: lines.keys.join("\n"))
+
+  if status.success? && !selected.strip.empty?
+    puts lines[selected.chomp]
+  end
+end
+
+hiiro.add_default { manager.help }
+
+hiiro.run

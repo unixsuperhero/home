@@ -1,0 +1,269 @@
+#!/bin/bash
+
+run_pattern() {
+  local num="$1"
+  local ptrn="$2"
+  local ptrn_num="$3"
+  local ofile="$HOME/work/tmp/$(printf "%03d" $ptrn_num).$(printf "%03d" $num).rg-results.00"
+  local ffile="$HOME/work/tmp/$(printf "%03d" $ptrn_num).$(printf "%03d" $num).rg-results.01"
+  shift 3
+  if [[  ! -f $ofile ]]; then
+    local cmd="rg -PS $ptrn -truby "
+    # for glob in "$@"; do
+    #   echo "  glob: $glob"
+    #   cmd="$cmd -g $glob"
+    # done
+    echo "  CMD: $cmd"
+    echo "  OFILE: $ofile"
+    $cmd >$ofile
+    sed 's/:.*//' $ofile | sort -u >$ffile
+  fi
+
+  stats_sets $ptrn_num "$ptrn" regexes
+}
+
+pattern_stats() {
+  echo "'$1':"
+  run_pattern 1 "$1" "$2" '!*_spec*'
+  # run_pattern 2 "$1" "$2" '*_spec*'
+
+  # a=$(rg -S "$1" -g '!*_spec*.rb' | wc -l)
+  # b=$(rg -S "$1" -g '!*_spec*.rb' -l | wc -l)
+  # printf "  code : %5d / %5d (excluding '*_spec*.rb')\n" $a $b
+  # test -z $STATS_DEBUG || rg -PS "$1" -g '!*_spec*' -g '*.rb' | head -5
+
+  # a=$(rg -S "$1" -g '*.rb' -g '!*_spec*' | wc -l)
+  # b=$(rg -S "$1" -g '*.rb' -g '!*_spec*' -l | wc -l)
+  # printf "  code : %5d / %5d (ONLY .rb files; excluding '*_spec*')\n" $a $b
+  # test -z $STATS_DEBUG || rg -PS "$1" -g '!*_spec*' -g '*.rb' | head -5
+
+  # a=$(rg -S "$1" -g '!*_spec*' -g '*.rb' | wc -l)
+  # b=$(rg -S "$1" -g '!*_spec*' -g '*.rb' -l | wc -l)
+  # printf "  code : %5d / %5d (excluding '*_spec*'; ONLY .rb files (reversed))\n" $a $b
+  # test -z $STATS_DEBUG || rg -PS "$1" -g '!*_spec*' -g '*.rb' | head -5
+
+  # a=$(rg -S "$1" -g '*_spec*.rb' | wc -l)
+  # b=$(rg -S "$1" -g '*_spec*.rb' -l | wc -l)
+  # printf "  specs: %5d / %5d\n\n" $a $b
+  # test -z $STATS_DEBUG || rg -PS "$1" -g '*_spec*.rb' | head -5
+}
+
+pattern_stats_pcre() {
+  echo "'$1':"
+  a=$(rg -PS "$1" -g '!*_spec*.rb' | wc -l)
+  b=$(rg -PS "$1" -g '!*_spec*.rb' -l | wc -l)
+  printf "  code : %5d / %5d (excluding '*_spec*.rb')\n" $a $b
+  test -z $STATS_DEBUG || rg -PS "$1" -g '!*_spec*.rb' | head -5
+
+  a=$(rg -PS "$1" -g '*.rb' -g '!*_spec*' | wc -l)
+  b=$(rg -PS "$1" -g '*.rb' -g '!*_spec*' -l | wc -l)
+  printf "  code : %5d / %5d (ONLY .rb files; excluding '*_spec*')\n" $a $b
+  test -z $STATS_DEBUG || rg -PS "$1" -g '*.rb' -g '!*_spec*' | head -5
+
+  a=$(rg -PS "$1" -g '!*_spec*' -g '*.rb' | wc -l)
+  b=$(rg -PS "$1" -g '!*_spec*' -g '*.rb' -l | wc -l)
+  printf "  code : %5d / %5d (excluding '*_spec*'; ONLY .rb files (reversed))\n" $a $b
+  test -z $STATS_DEBUG || rg -PS "$1" -g '!*_spec*' -g '*.rb' | head -5
+
+  a=$(rg -PS "$1" -g '*_spec*.rb' | wc -l)
+  b=$(rg -PS "$1" -g '*_spec*.rb' -l | wc -l)
+  printf "  specs: %5d / %5d\n\n" $a $b
+  test -z $STATS_DEBUG || rg -PS "$1" -g '*_spec*.rb' | head -5
+}
+
+# cat <<MEMOIZED
+# MEMO: v1
+# --------
+# 
+# '::StoreConfiguration::':
+#   code :  7856 /  5390
+#   specs:   904 /   369
+# 
+# 'Domain::Constants::StoreConfiguration::':
+#   code :  7833 /  5378
+#   specs:   895 /   365
+# 
+# '::StoreConfigurationGroups::':
+#   code :   833 /   789
+#   specs:    24 /    19
+# 
+# 'Domain::Constants::StoreConfigurationGroups::':
+#   code :   833 /   789
+#   specs:    24 /    19
+# 
+# '::StoreConfiguration::Instacart':
+#   code :  5321 /  4904
+#   specs:   301 /   211
+# 
+# 'Domain::Constants::StoreConfiguration::Instacart':
+#   code :  5321 /  4904
+#   specs:   301 /   211
+# 
+# '[^:]publix\b':
+#   code :  1570 /   655
+#   specs:   865 /   310
+# 
+# '::publix':
+#   code :  1554 /   636
+#   specs:   814 /   294
+# 
+# '::publix\b':
+#   code :   732 /   302
+#   specs:   438 /   137
+# 
+# 'Domain::Constants::StoreConfiguration::(?!Instacart)\w\w*':
+#   code :  2237 /   526 (excluding '*_spec*.rb')
+#   code :  1948 /   505 (ONLY .rb files)
+#   specs:   595 /   232
+# 
+# 'Domain::Constants::StoreConfiguration::Publix\b':
+#   code :    80 /    78 (excluding '*_spec*.rb')
+#   code :    78 /    76 (ONLY .rb files)
+#   specs:    61 /    39
+# 
+# MEMOIZED
+# 
+# cat <<MEMOIZED
+# 
+# MEMO: v2
+# --------
+# 
+# '::StoreConfiguration::':
+#   code :  9255 /  5096 (excluding '*_spec*.rb')
+#   code :  6952 /  5021 (ONLY .rb files; excluding '*_spec*')
+#   specs:   904 /   369
+# 
+# 'Domain::Constants::StoreConfiguration::':
+#   code :  7287 /  5064 (excluding '*_spec*.rb')
+#   code :  6938 /  5013 (ONLY .rb files; excluding '*_spec*')
+#   specs:   895 /   365
+# 
+# '::StoreConfigurationGroups::':
+#   code :   815 /   773 (excluding '*_spec*.rb')
+#   code :   809 /   770 (ONLY .rb files; excluding '*_spec*')
+#   specs:    24 /    19
+# 
+# 'Domain::Constants::StoreConfigurationGroups::':
+#   code :   813 /   773 (excluding '*_spec*.rb')
+#   code :   809 /   770 (ONLY .rb files; excluding '*_spec*')
+#   specs:    24 /    19
+# 
+# '::StoreConfiguration::Instacart':
+#   code :  5077 /  4725 (excluding '*_spec*.rb')
+#   code :  5020 /  4693 (ONLY .rb files; excluding '*_spec*')
+#   specs:   301 /   211
+# 
+# 'Domain::Constants::StoreConfiguration::Instacart':
+#   code :  5075 /  4725 (excluding '*_spec*.rb')
+#   code :  5020 /  4693 (ONLY .rb files; excluding '*_spec*')
+#   specs:   301 /   211
+# 
+# '[^:]publix\b':
+#   code : 33410 /  1336 (excluding '*_spec*.rb')
+#   code :   705 /   345 (ONLY .rb files; excluding '*_spec*')
+#   specs:   865 /   310
+# 
+# '::publix':
+#   code :   784 /   352 (excluding '*_spec*.rb')
+#   code :   740 /   342 (ONLY .rb files; excluding '*_spec*')
+#   specs:   814 /   294
+# 
+# '::publix\b':
+#   code :   306 /   170 (excluding '*_spec*.rb')
+#   code :   294 /   165 (ONLY .rb files; excluding '*_spec*')
+#   specs:   438 /   137
+# 
+# 'Domain::Constants::StoreConfiguration::(?!Instacart)\w\w*':
+#   code :  2239 /   527 (excluding '*_spec*.rb')
+#   code :  1948 /   505 (ONLY .rb files; excluding '*_spec*')
+#   specs:   595 /   232
+# 
+# 'Domain::Constants::StoreConfiguration::Publix\b':
+#   code :    81 /    78 (excluding '*_spec*.rb')
+#   code :    78 /    76 (ONLY .rb files; excluding '*_spec*')
+#   specs:    61 /    39
+# 
+# MEMOIZED
+
+# cat <<MEMOIZED
+# '::StoreConfiguration::':
+#   code :  9267 /  5096 (excluding '*_spec*.rb')
+#   code :  6952 /  5021 (ONLY .rb files; excluding '*_spec*')
+#   code :  7856 /  5390 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   904 /   369
+# 
+# 'Domain::Constants::StoreConfiguration::':
+#   code :  7291 /  5064 (excluding '*_spec*.rb')
+#   code :  6938 /  5013 (ONLY .rb files; excluding '*_spec*')
+#   code :  7833 /  5378 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   895 /   365
+# 
+# '::StoreConfigurationGroups::':
+#   code :   817 /   773 (excluding '*_spec*.rb')
+#   code :   809 /   770 (ONLY .rb files; excluding '*_spec*')
+#   code :   833 /   789 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:    24 /    19
+# 
+# 'Domain::Constants::StoreConfigurationGroups::':
+#   code :   814 /   773 (excluding '*_spec*.rb')
+#   code :   809 /   770 (ONLY .rb files; excluding '*_spec*')
+#   code :   833 /   789 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:    24 /    19
+# 
+# '::StoreConfiguration::Instacart':
+#   code :  5079 /  4725 (excluding '*_spec*.rb')
+#   code :  5020 /  4693 (ONLY .rb files; excluding '*_spec*')
+#   code :  5321 /  4904 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   301 /   211
+# 
+# 'Domain::Constants::StoreConfiguration::Instacart':
+#   code :  5076 /  4725 (excluding '*_spec*.rb')
+#   code :  5020 /  4693 (ONLY .rb files; excluding '*_spec*')
+#   code :  5321 /  4904 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   301 /   211
+# 
+# '[^:]publix\b':
+#   code : 33411 /  1336 (excluding '*_spec*.rb')
+#   code :   705 /   345 (ONLY .rb files; excluding '*_spec*')
+#   code :  1570 /   655 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   865 /   310
+# 
+# '::publix':
+#   code :   787 /   352 (excluding '*_spec*.rb')
+#   code :   740 /   342 (ONLY .rb files; excluding '*_spec*')
+#   code :  1554 /   636 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   814 /   294
+# 
+# '::publix\b':
+#   code :   309 /   170 (excluding '*_spec*.rb')
+#   code :   294 /   165 (ONLY .rb files; excluding '*_spec*')
+#   code :   732 /   302 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   438 /   137
+# 
+# 'Domain::Constants::StoreConfiguration::(?!Instacart)\w\w*':
+#   code :  2240 /   527 (excluding '*_spec*.rb')
+#   code :  1948 /   505 (ONLY .rb files; excluding '*_spec*')
+#   code :  2543 /   737 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:   595 /   232
+# 
+# 'Domain::Constants::StoreConfiguration::Publix\b':
+#   code :    82 /    78 (excluding '*_spec*.rb')
+#   code :    78 /    76 (ONLY .rb files; excluding '*_spec*')
+#   code :   139 /   115 (excluding '*_spec*'; ONLY .rb files (reversed))
+#   specs:    61 /    39
+# 
+# MEMOIZED
+
+pattern_stats '::StoreConfiguration::'                                          1
+pattern_stats 'Domain::Constants::StoreConfiguration::'                         2
+pattern_stats '::StoreConfigurationGroups::'                                    3
+pattern_stats 'Domain::Constants::StoreConfigurationGroups::'                   4
+pattern_stats '::StoreConfiguration::Instacart'                                 5
+pattern_stats 'Domain::Constants::StoreConfiguration::Instacart'                6
+pattern_stats '[^:]publix\b'                                                    7
+pattern_stats '::publix'                                                        8
+pattern_stats '::publix\b'                                                      9
+pattern_stats 'Domain::Constants::StoreConfiguration::(?!Instacart)\w\w*'      10
+pattern_stats 'Domain::Constants::StoreConfiguration::Publix\b'                11
+
+stats_sets nil nil perms

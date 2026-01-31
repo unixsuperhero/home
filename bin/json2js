@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cat "$1" | jq -c '.' | node -e 'process.stdin.on("data", d => console.log(JSON.parse(d).name));'
+

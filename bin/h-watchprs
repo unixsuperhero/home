@@ -4,32 +4,28 @@ require 'pry'
 require 'json'
 require 'digest'
 require 'optparse'
+require 'shellwords'
 
 options = {
-  say_approvals: true,
-  say_status: true,
-  say_passing: true,
-  say_publishing: true,
+  notify_approvals: true,
+  notify_status: true,
+  notify_publishing: true,
   mark_ready: false
 }
 
 OptionParser.new do |opts|
   opts.banner = "Usage: h-watchprs [options]"
 
-  opts.on("-a", "--no-say-approvals", "Disable 'say' for new approvals") do
-    options[:say_approvals] = false
+  opts.on("-a", "--no-notify-approvals", "Disable notifications for new approvals") do
+    options[:notify_approvals] = false
   end
 
-  opts.on("-s", "--no-say-status", "Disable 'say' for status changes") do
-    options[:say_status] = false
+  opts.on("-s", "--no-notify-status", "Disable notifications for status changes") do
+    options[:notify_status] = false
   end
 
-  opts.on("-p", "--no-say-passing", "Disable 'say' for passing PRs") do
-    options[:say_passing] = false
-  end
-
-  opts.on("-u", "--no-say-publishing", "Disable 'say' when publishing PR as ready") do
-    options[:say_publishing] = false
+  opts.on("-u", "--no-notify-publishing", "Disable notifications when publishing PR as ready") do
+    options[:notify_publishing] = false
   end
 
   opts.on("-r", "--mark-ready", "Enable marking PR as ready when passing") do
@@ -43,6 +39,26 @@ OptionParser.new do |opts|
 end.parse!
 
 SLEEP_TIME = ENV.fetch('sleep_for', 60)
+
+def notify(message:, title: nil, url: nil, sound: nil)
+  message = message.tr('[]()', '')
+  title = title.tr('[]()', '')
+  args = ['-message', message.shellescape]
+  args += ['-title', title.shellescape] if title
+  args += ['-open', url.shellescape] if url
+  args += ['-sound', sound.shellescape] if sound
+
+  cmd = "terminal-notifier #{args.join(' ')}"
+  puts
+  puts "!! => NOTIFICATION COMMAND: => #{cmd}"
+  puts
+  system(cmd)
+end
+
+def pr_url(pr_number)
+  "https://github.com/instacart/carrot/pull/#{pr_number}"
+end
+
 prs = {}
 approvals = {}
 first_run = true
@@ -64,12 +80,17 @@ loop do
   current_pr = nil
   new_statuses = {}
   new_approvals = {}
+  pr_titles = {}
   stdout.lines(chomp: true).map do |line|
     collecting = true if line.match?(/created by you/i)
     next unless collecting
 
     if num = line[/[#]\d+/]
       current_pr = num.sub(?#, '')
+      # Extract PR title: everything after #123 and before [branch-name]
+      if match = line.match(/#\d+\s+(.+?)\s+\[/)
+        pr_titles[current_pr] = match[1].strip
+      end
       next
     end
 
@@ -105,30 +126,48 @@ loop do
   end
 
   new_approvals.each do |current_pr, new_approval|
-    if approvals.has_key?(current_pr)
-      if approvals[current_pr] != new_approval
-        system('say', 'pr', 'has', new_approval, 'approvals') if options[:say_approvals]
-        puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
+    old_approval = approvals[current_pr]
+    title = pr_titles[current_pr]
+    if old_approval.nil? || old_approval != new_approval
+      if options[:notify_approvals]
+        approval_info = old_approval ? "#{old_approval} → #{new_approval}" : "#{new_approval} approval(s)"
+        notify(
+          title: "PR ##{current_pr} Approval",
+          message: "#{title}\nApprovals: #{approval_info}",
+          url: pr_url(current_pr),
+          sound: "Sonumi"
+        )
       end
-    else
-      system('say', 'pr', 'has', new_approval, 'approvals') if options[:say_approvals]
       puts format('%7s (approvals: %s): https://github.com/instacart/carrot/pull/%s', current_pr, new_approval, current_pr)
     end
   end
 
   new_statuses.each do |current_pr, new_status|
     old_status = prs[current_pr]
-    puts(
-      current_pr:,
-      old_status:,
-      new_status:,
-    )
+    title = pr_titles[current_pr]
+    puts format('%7s (status: %s => %s): https://github.com/instacart/carrot/pull/%s', current_pr, old_status, new_status, current_pr)
     if prs.key?(current_pr) && old_status != new_status
-      system('say', 'pr', 'is', new_status) if options[:say_status]
+      if options[:notify_status]
+        notify(
+          title: "PR ##{current_pr} Status Changed",
+          message: "#{title}\n#{old_status} → #{new_status}",
+          url: pr_url(current_pr),
+          sound: "Sonumi"
+        )
+      end
 
       if new_status[/passing/]
-        system('say', 'publishing pr') if options[:mark_ready] && options[:say_publishing]
-        system('gh', 'pr', 'ready', current_pr) if options[:mark_ready]
+        if options[:mark_ready]
+          if options[:notify_publishing]
+            notify(
+              title: "PR ##{current_pr} Publishing",
+              message: "#{title}\nMarking PR as ready for review",
+              url: pr_url(current_pr),
+              sound: "Sonumi"
+            )
+          end
+          system('gh', 'pr', 'ready', current_pr)
+        end
         system('gh', 'pr', 'view', '-w', current_pr)
       end
 

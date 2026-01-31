@@ -1,0 +1,349 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'time'
+
+POLL_INTERVAL = 30
+CODE_FREEZE_CHECK = /code.?freeze/i
+
+# Store previous state for each PR
+$pr_states = {}
+
+def sanitize_text(text)
+  # Remove brackets and parentheses
+  text.to_s.gsub(/[\[\]\(\)]/, '')
+end
+
+def notify(title:, message:, url:, sound: 'default')
+  clean_title = sanitize_text(title)
+  clean_message = sanitize_text(message)
+
+  cmd = [
+    'terminal-notifier',
+    '-title', clean_title,
+    '-message', clean_message,
+    '-open', url,
+    '-sound', sound
+  ]
+
+  system(*cmd)
+end
+
+def log(message)
+  timestamp = Time.now.strftime('%H:%M:%S')
+  puts "[#{timestamp}] #{message}"
+end
+
+def fetch_my_prs
+  # Get PRs created by me
+  json = `gh pr list --author @me --state open --json number,title,url,headRefName,reviewDecision,mergeStateStatus,mergeable,statusCheckRollup,reviews`
+  JSON.parse(json)
+rescue JSON::ParserError => e
+  log "Error parsing PR list: #{e.message}"
+  []
+end
+
+def fetch_pr_checks(pr_number)
+  json = `gh pr view #{pr_number} --json statusCheckRollup`
+  data = JSON.parse(json)
+  data['statusCheckRollup'] || []
+rescue JSON::ParserError => e
+  log "Error fetching checks for PR ##{pr_number}: #{e.message}"
+  []
+end
+
+def analyze_checks(checks)
+  return { status: :no_checks, failed: [], pending: [], passed: [], skipped: [], total: 0 } if checks.nil? || checks.empty?
+
+  failed = []
+  pending = []
+  passed = []
+  skipped = []
+
+  checks.each do |check|
+    name = check['name'] || check['context'] || 'Unknown'
+    conclusion = check['conclusion']
+    status = check['status']
+    url = check['detailsUrl'] || check['targetUrl'] || ''
+
+    # Skip code freeze check
+    next if name =~ CODE_FREEZE_CHECK
+
+    check_info = { name: name, url: url }
+
+    if status == 'IN_PROGRESS' || status == 'QUEUED' || status == 'PENDING' || conclusion.nil?
+      pending << check_info
+    elsif conclusion == 'FAILURE' || conclusion == 'TIMED_OUT' || conclusion == 'CANCELLED'
+      check_info[:conclusion] = conclusion
+      failed << check_info
+    elsif conclusion == 'SKIPPED'
+      skipped << check_info
+    elsif conclusion == 'SUCCESS' || conclusion == 'NEUTRAL'
+      passed << check_info
+    end
+  end
+
+  total = passed.length + pending.length + failed.length + skipped.length
+
+  status = if failed.any?
+    :failing
+  elsif pending.any?
+    :running
+  else
+    :passing
+  end
+
+  { status: status, failed: failed, pending: pending, passed: passed, skipped: skipped, total: total }
+end
+
+def count_approvals(reviews)
+  return 0 if reviews.nil? || reviews.empty?
+
+  # Get latest review per author
+  latest_by_author = {}
+  reviews.each do |review|
+    author = review['author']&.fetch('login', nil)
+    next unless author
+
+    # Keep the latest review per author
+    latest_by_author[author] = review
+  end
+
+  latest_by_author.values.count { |r| r['state'] == 'APPROVED' }
+end
+
+def get_merge_status(pr)
+  merge_state = pr['mergeStateStatus']
+  mergeable = pr['mergeable']
+
+  case merge_state
+  when 'MERGED'
+    :merged
+  when 'BLOCKED'
+    :blocked
+  when 'BEHIND'
+    :behind
+  when 'DIRTY'
+    :conflicts
+  when 'CLEAN'
+    :ready
+  when 'UNSTABLE'
+    :unstable
+  when 'HAS_HOOKS'
+    :has_hooks
+  else
+    mergeable == 'MERGEABLE' ? :mergeable : :unknown
+  end
+end
+
+def check_in_merge_queue(pr)
+  # Check if PR is in merge queue based on mergeStateStatus
+  pr['mergeStateStatus'] == 'QUEUED' || pr['mergeQueueEntry']
+end
+
+def process_pr(pr)
+  number = pr['number']
+  title = pr['title']
+  url = pr['url']
+  branch = pr['headRefName']
+
+  checks = pr['statusCheckRollup'] || []
+  check_analysis = analyze_checks(checks)
+  approval_count = count_approvals(pr['reviews'])
+  merge_status = get_merge_status(pr)
+  in_queue = check_in_merge_queue(pr)
+
+  current_state = {
+    check_status: check_analysis[:status],
+    approval_count: approval_count,
+    merge_status: merge_status,
+    in_merge_queue: in_queue,
+    failed_checks: check_analysis[:failed],
+    pending_checks: check_analysis[:pending]
+  }
+
+  prev_state = $pr_states[number]
+
+  # Log current state
+  status_emoji = case check_analysis[:status]
+  when :passing then '✓'
+  when :failing then '✗'
+  when :running then '◐'
+  else '?'
+  end
+
+  log "PR ##{number}: #{status_emoji} checks=#{check_analysis[:status]} approvals=#{approval_count} merge=#{merge_status}#{in_queue ? ' IN_QUEUE' : ''}"
+  log "  #{title}"
+  log "  #{url}"
+
+  # Log check summary
+  passed_count = check_analysis[:passed].length
+  pending_count = check_analysis[:pending].length
+  failed_count = check_analysis[:failed].length
+  skipped_count = check_analysis[:skipped].length
+  total_count = check_analysis[:total]
+
+  summary_parts = []
+  summary_parts << "#{passed_count} passed" if passed_count > 0
+  summary_parts << "#{pending_count} pending" if pending_count > 0
+  summary_parts << "#{failed_count} failed" if failed_count > 0
+  summary_parts << "#{skipped_count} skipped" if skipped_count > 0
+
+  if total_count > 0
+    log "  Checks: #{summary_parts.join(', ')} / #{total_count} total"
+  else
+    log "  Checks: none"
+  end
+
+  # Print failed checks with names and URLs
+  if check_analysis[:failed].any?
+    log "  Failed checks:"
+    check_analysis[:failed].each do |check|
+      log "    ✗ #{check[:name]}"
+      log "      #{check[:url]}" if check[:url] && !check[:url].empty?
+    end
+  end
+
+  # Check for changes and notify
+  if prev_state
+    # Check status changed
+    if prev_state[:check_status] != current_state[:check_status]
+      case current_state[:check_status]
+      when :passing
+        notify(
+          title: "Checks Passed - PR ##{number}",
+          message: title,
+          url: url,
+          sound: 'Glass'
+        )
+        log "  → NOTIFICATION: Checks now passing!"
+      when :failing
+        failed_names = check_analysis[:failed].map { |c| c[:name] }.join(', ')
+        notify(
+          title: "Checks Failed - PR ##{number}",
+          message: "#{title} - Failed: #{failed_names}",
+          url: url,
+          sound: 'Basso'
+        )
+        log "  → NOTIFICATION: Checks failed!"
+      when :running
+        if prev_state[:check_status] == :failing || prev_state[:check_status] == :passing
+          log "  → Checks re-running"
+        end
+      end
+    end
+
+    # Approval count changed
+    if prev_state[:approval_count] != current_state[:approval_count]
+      if current_state[:approval_count] > prev_state[:approval_count]
+        notify(
+          title: "New Approval - PR ##{number}",
+          message: "#{title} - #{current_state[:approval_count]} approvals",
+          url: url,
+          sound: 'Pop'
+        )
+        log "  → NOTIFICATION: New approval! Now at #{current_state[:approval_count]}"
+      else
+        log "  → Approval removed, now at #{current_state[:approval_count]}"
+      end
+    end
+
+    # Merge status changed
+    if prev_state[:merge_status] != current_state[:merge_status]
+      case current_state[:merge_status]
+      when :merged
+        notify(
+          title: "PR Merged - ##{number}",
+          message: title,
+          url: url,
+          sound: 'Hero'
+        )
+        log "  → NOTIFICATION: PR merged!"
+      when :ready
+        notify(
+          title: "Ready to Merge - PR ##{number}",
+          message: title,
+          url: url,
+          sound: 'Purr'
+        )
+        log "  → NOTIFICATION: Ready to merge!"
+      when :conflicts
+        notify(
+          title: "Merge Conflicts - PR ##{number}",
+          message: title,
+          url: url,
+          sound: 'Sosumi'
+        )
+        log "  → NOTIFICATION: Has merge conflicts!"
+      when :behind
+        log "  → Branch is behind base"
+      end
+    end
+
+    # Merge queue status changed
+    if prev_state[:in_merge_queue] != current_state[:in_merge_queue]
+      if current_state[:in_merge_queue]
+        notify(
+          title: "Added to Merge Queue - PR ##{number}",
+          message: title,
+          url: url,
+          sound: 'Submarine'
+        )
+        log "  → NOTIFICATION: Added to merge queue!"
+      else
+        notify(
+          title: "Removed from Merge Queue - PR ##{number}",
+          message: title,
+          url: url,
+          sound: 'Funk'
+        )
+        log "  → NOTIFICATION: Removed from merge queue"
+      end
+    end
+  else
+    log "  (initial state captured)"
+  end
+
+  $pr_states[number] = current_state
+end
+
+def main
+  log "Starting PR monitor (polling every #{POLL_INTERVAL}s)"
+  log "Ignoring code freeze check"
+  log "Press Ctrl+C to stop"
+  puts
+
+  loop do
+    log "Fetching PRs..."
+    prs = fetch_my_prs
+
+    if prs.empty?
+      log "No open PRs found"
+    else
+      log "Found #{prs.length} open PR(s)"
+      puts
+
+      prs.each do |pr|
+        process_pr(pr)
+      end
+    end
+
+    # Clean up state for closed PRs
+    open_numbers = prs.map { |pr| pr['number'] }
+    closed = $pr_states.keys - open_numbers
+    closed.each do |num|
+      log "PR ##{num} no longer open, removing from tracking"
+      $pr_states.delete(num)
+    end
+
+    puts
+    log "Sleeping #{POLL_INTERVAL}s..."
+    puts "-" * 50
+    sleep POLL_INTERVAL
+  end
+rescue Interrupt
+  puts
+  log "Stopped"
+end
+
+main

@@ -15,13 +15,18 @@ do
   echo "SHA: $sha"
   echo
 
-  isc builds "partners@${sha}" | tee tmp/builds
+  isc builds "customers-backend@${sha}" | tee tmp/builds
+
+  head -3 tmp/builds
 
   egrep -i 'no builds' tmp/builds &>/dev/null && continue
 
-  (tail +2 tmp/builds | head -1 | egrep "^.*${sha}[^[:space:]]*[[:space:]]+\bsucceeded") &>/dev/null && break
+  (tail +2 tmp/builds | head -1 | egrep "^.*${sha}[^[:space:]]*[[:space:]]+\bin-progress") &>/dev/null || break
   sleep 2
 done
 
 say 'build complete'
 
+# isc task -e development run --wait-completed --conf "BASE_SHA=$(git fsha master)" --conf "SSO_CONFIG_TYPE=id_token" generate-sso-config-test.partners-domain.customers-backend.customers $(git cb) --command "bundle exec rake partners_domain:sso_config:test"
+
+# say 'task is done running'
