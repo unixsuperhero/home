@@ -92,3 +92,9 @@ notes.old/
 .matplotlib/
 .modelscope/
 .claude.json
+/.config/hiiro/history.yml
+/.bun/install/cache/*
+/repos/davinci-resolve-mcp/
+/.cursor/
+/.keras/
+workflow-steps*

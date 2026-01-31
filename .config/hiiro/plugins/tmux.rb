@@ -2,8 +2,6 @@
 
 module Tmux
   def self.load(hiiro)
-    hiiro.log "Plugin loaded: #{name}"
-
     attach_methods(hiiro)
   end
 

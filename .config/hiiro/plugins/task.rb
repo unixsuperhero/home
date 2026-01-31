@@ -2,8 +2,6 @@
 
 module Task
   def self.load(hiiro)
-    hiiro.log "Plugin loaded: #{name}"
-
     hiiro.load_plugin(Tmux)
     attach_methods(hiiro)
     add_subcommands(hiiro)
@@ -26,6 +24,7 @@ module Task
         status: ->(*sargs) { tasks.status },
         save: ->(*sargs) { tasks.save_current },
         stop: ->(*sargs) { tasks.stop_current },
+        subtask: ->(*sargs) { tasks.handle_subtask(*sargs) },
       }
 
       case args
@@ -51,6 +50,14 @@ module Task
         tasks.stop_current
       in ['stop', task_name]
         tasks.stop_task(task_name)
+      in ['subtask']
+        tasks.subtask_help
+      in ['subtask', 'ls']
+        tasks.list_subtasks
+      in ['subtask', 'new', subtask_name]
+        tasks.new_subtask(subtask_name)
+      in ['subtask', 'switch', subtask_name]
+        tasks.switch_subtask(subtask_name)
       in [subcmd, *sargs]
         match = runner_map.keys.find { |full_subcmd| full_subcmd.to_s.start_with?(subcmd) }
 
@@ -94,6 +101,7 @@ module Task
       puts "  save                  Save current tmux session info for this task"
       puts "  status, st            Show current task status"
       puts "  stop                  Stop working on current task (worktree becomes available)"
+      puts "  subtask <subcmd>      Manage subtasks (ls, new, switch)"
     end
 
     # List all worktrees and their active tasks
@@ -362,6 +370,183 @@ module Task
       puts "Stopped task '#{task_name}' (worktree '#{tree}' now available for reuse)"
       true
     end
+
+    # Subtask management
+    def subtask_help
+      puts "Usage: h task subtask <subcommand> [args]"
+      puts "       h subtask <subcommand> [args]"
+      puts
+      puts "Subcommands:"
+      puts "  ls                    List subtasks for current task"
+      puts "  new SUBTASK_NAME      Start a new subtask (creates worktree and session)"
+      puts "  switch SUBTASK_NAME   Switch to subtask's tmux session"
+    end
+
+    def handle_subtask(*args)
+      case args
+      in []
+        subtask_help
+      in ['ls']
+        list_subtasks
+      in ['new', subtask_name]
+        new_subtask(subtask_name)
+      in ['switch', subtask_name]
+        switch_subtask(subtask_name)
+      else
+        puts "Unknown subtask command: #{args.inspect}"
+        subtask_help
+      end
+    end
+
+    def list_subtasks
+      current = current_task
+      unless current
+        puts "ERROR: Not currently in a task session"
+        return false
+      end
+
+      parent_task = current[:task]
+      subtasks = subtasks_for_task(parent_task)
+
+      if subtasks.empty?
+        puts "No subtasks for task '#{parent_task}'."
+        puts
+        puts "Create one with 'h subtask new SUBTASK_NAME'"
+        return
+      end
+
+      puts "Subtasks for '#{parent_task}':"
+      puts
+      subtasks.each do |subtask|
+        marker = subtask['active'] ? "*" : " "
+        puts format("%s %-25s  tree: %-15s  created: %s",
+          marker,
+          subtask['name'],
+          subtask['worktree'] || '(none)',
+          subtask['created_at']&.split('T')&.first || '?'
+        )
+      end
+    end
+
+    def new_subtask(subtask_name)
+      current = current_task
+      unless current
+        puts "ERROR: Not currently in a task session"
+        puts "Use 'h task start TASK_NAME' first"
+        return false
+      end
+
+      parent_task = current[:task]
+      full_subtask_name = "#{parent_task}/#{subtask_name}"
+
+      # Check if subtask already exists
+      existing = subtasks_for_task(parent_task).find { |s| s['name'] == subtask_name }
+      if existing
+        puts "Subtask '#{subtask_name}' already exists for task '#{parent_task}'"
+        puts "Switching to existing session..."
+        switch_subtask(subtask_name)
+        return true
+      end
+
+      # Create new worktree for subtask
+      puts "Creating new worktree for subtask '#{subtask_name}'..."
+      new_path = File.join(Dir.home, 'work', full_subtask_name)
+
+      result = system('git', '-C', main_repo_path, 'worktree', 'add', '--detach', new_path)
+      unless result
+        puts "ERROR: Failed to create worktree"
+        return false
+      end
+      clear_worktree_cache
+
+      # Associate subtask with tree
+      assign_task_to_tree(full_subtask_name, full_subtask_name)
+
+      # Record subtask in parent's metadata
+      add_subtask_to_task(parent_task, {
+        'name' => subtask_name,
+        'worktree' => full_subtask_name,
+        'session' => full_subtask_name,
+        'created_at' => Time.now.iso8601,
+        'active' => true
+      })
+
+      # Create/switch to tmux session
+      Dir.chdir(new_path)
+      hiiro.start_tmux_session(full_subtask_name)
+
+      puts "Started subtask '#{subtask_name}' for task '#{parent_task}'"
+      true
+    end
+
+    def switch_subtask(subtask_name)
+      current = current_task
+      unless current
+        puts "ERROR: Not currently in a task session"
+        puts "Use 'h task start TASK_NAME' first"
+        return false
+      end
+
+      parent_task = current[:task]
+      # Handle if we're in a subtask - get the parent
+      if parent_task.include?('/')
+        parent_task = parent_task.split('/').first
+      end
+
+      subtask = find_subtask(parent_task, subtask_name)
+      unless subtask
+        puts "Subtask '#{subtask_name}' not found for task '#{parent_task}'"
+        puts
+        list_subtasks
+        return false
+      end
+
+      session_name = subtask['session'] || "#{parent_task}/#{subtask_name}"
+      tree_name = subtask['worktree'] || session_name
+
+      # Check if session exists
+      session_exists = system('tmux', 'has-session', '-t', session_name, err: File::NULL)
+
+      if session_exists
+        hiiro.start_tmux_session(session_name)
+      else
+        # Create new session in the worktree path
+        path = tree_path(tree_name)
+        if Dir.exist?(path)
+          Dir.chdir(path)
+          hiiro.start_tmux_session(session_name)
+        else
+          puts "ERROR: Worktree path '#{path}' does not exist"
+          return false
+        end
+      end
+
+      puts "Switched to subtask '#{subtask_name}'"
+      true
+    end
+
+    private
+
+    def subtasks_for_task(task_name)
+      meta = task_metadata(task_name)
+      return [] unless meta
+      meta['subtasks'] || []
+    end
+
+    def find_subtask(parent_task, subtask_name)
+      subtasks = subtasks_for_task(parent_task)
+      subtasks.find { |s| s['name'].start_with?(subtask_name) }
+    end
+
+    def add_subtask_to_task(parent_task, subtask_data)
+      meta = task_metadata(parent_task) || {}
+      meta['subtasks'] ||= []
+      meta['subtasks'] << subtask_data
+      FileUtils.mkdir_p(task_dir)
+      File.write(task_metadata_file(parent_task), YAML.dump(meta))
+    end
+
+    public
 
     def list_configured_apps
       if apps_config.any?

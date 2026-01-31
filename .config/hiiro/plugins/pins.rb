@@ -2,8 +2,6 @@
 
 module Pins
   def self.load(hiiro)
-    hiiro.log "Plugin loaded: #{name}"
-
     attach_methods(hiiro)
     add_subcommands(hiiro)
   end
@@ -15,7 +13,6 @@ module Pins
       case args
       in [] then pins.pins.each {|k,v| puts "#{k} => #{v.inspect}" }
       in ['all'] then pins.pins.each {|k,v| puts "#{k} => #{v.inspect}" }
-      in ['clear'] then pins.clear
       in ['get', name] then puts pins.get(name)
       in [name] then puts pins.get(name)
       in ['rm', name] then puts pins.remove_and_save(name)
@@ -54,11 +51,6 @@ module Pins
       set(name, value)
       save_pins
       value
-    end
-
-    def clear
-      @pins = {}
-      save_pins
     end
 
     def find(partial)

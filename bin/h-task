@@ -5,7 +5,6 @@ require "fileutils"
 require "yaml"
 require "pathname"
 
-Hiiro.load_env
 hiiro = Hiiro.init(*ARGV, plugins: [Tmux])
 
 class TaskManager
@@ -392,8 +391,12 @@ class TaskManager
       puts printable_apps.keys.sort.map{|k| format("%#{longest_app_name}s => %s", k, printable_apps[k]) }
       exit 1
     when 1
-      pwd_to_root = Pathname.new(tree_root).relative_path_from(Pathname.pwd)
-      print File.join(pwd_to_root, apps_config[matching_apps.first])
+      if Pathname.pwd.ascend.any? { |parent| parent.equal?(tree_root) }
+        pwd_to_root = Pathname.new(tree_root).relative_path_from(Pathname.pwd)
+        print File.join(pwd_to_root, apps_config[matching_apps.first])
+      else
+        print File.join(tree_root, apps_config[matching_apps.first])
+      end
       exit 0
     else
       puts "Multiple matches found:"
@@ -401,8 +404,6 @@ class TaskManager
       exit 1
     end
   end
-
-  private
 
   def printable_apps
     apps_config.transform_keys(&:to_s)
@@ -562,6 +563,12 @@ class TaskManager
     { task: task_name, tree: tree, session: session }
   end
 
+  def task_name
+    task = current_task
+
+    (task || {})[:task]
+  end
+
   def switch_to_task(task_name, tree, app: nil)
     session = session_name_for(task_name)
     base_path = tree_path(tree)
@@ -698,14 +705,13 @@ hiiro.add_subcmd(:ls) { tasks.list_trees }
 hiiro.add_subcmd(:start) { |task_name, app=nil| tasks.start_task(task_name, app: app) }
 hiiro.add_subcmd(:switch) { |task_name=nil| tasks.switch_task(task_name) }
 hiiro.add_subcmd(:app) { |app_name| tasks.open_app(app_name) }
-hiiro.add_subcmd(:path) { |app_name=nil, task=nil| tasks.app_path(app_name, task: task) }
+hiiro.add_subcmd(:path) { |app_name=nil, task=nil| tasks.app_path(app_name, task: task || tasks.task_name) }
 hiiro.add_subcmd(:cd) { |*args| tasks.cd_app(*args) }
 hiiro.add_subcmd(:apps) { tasks.list_configured_apps }
 hiiro.add_subcmd(:status) { tasks.status }
 hiiro.add_subcmd(:st) { tasks.status }
 hiiro.add_subcmd(:save) { tasks.save_current }
 hiiro.add_subcmd(:stop) { |task_name=nil| task_name ? tasks.stop_task(task_name) : tasks.stop_current }
-
-hiiro.add_default { tasks.help }
+hiiro.add_subcmd(:current) { print tasks.task_name }
 
 hiiro.run
