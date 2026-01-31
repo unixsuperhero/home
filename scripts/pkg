@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+(
+  cd ..
+  tar cvzf home.tar.gz home/
+  open -R home.tar.gz
+)
+

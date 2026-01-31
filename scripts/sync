@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# Compare directories interactively
+# This script compares bin/ and .config/hiiro/ with their counterparts in $OTHER_DIR
+
+set -e
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_DIR"
+
+OTHER_DIR="$HOME"
+
+echo "Comparing directories with ../home/"
+echo "Repository: $REPO_DIR ($0)"
+echo "Other Dir: $OTHER_DIR"
+echo
+
+# Function to prompt for y/n
+ask_yn() {
+  local prompt="$1"
+  local response
+  read -p "$prompt (y/N): " response </dev/tty
+  [[ "$response" =~ ^[yY]$ ]]
+}
+
+# Function to copy file with confirmation
+handle_copy() {
+  local src="$1"
+  local dst="$2"
+  local direction="$3"
+
+  echo
+  echo "File only in $direction: $src"
+  if ask_yn "Copy to $dst?"; then
+    mkdir -p "$(dirname "$dst")"
+    cp -v "$src" "$dst"
+    echo "Copied!"
+  else
+    echo "Skipped."
+  fi
+}
+
+# Function to diff files with confirmation
+handle_diff() {
+  local file1="$1"
+  local file2="$2"
+
+  echo
+  echo "DIFFERENT: $file1 <=> $file2"
+  if ask_yn "Open in vim diff?"; then
+    nvim -d "$file1" "$file2" </dev/tty >/dev/tty
+  else
+    echo "Skipped."
+  fi
+}
+
+# Process diff output for a directory pair
+process_diff() {
+  local repo_dir="$1"
+  local home_dir="$2"
+
+  echo "========================================="
+  echo "Comparing: $repo_dir <=> $home_dir"
+  echo "========================================="
+
+  # Use diff -qrs and process line by line
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^"Only in "(.*)": "(.*) ]]; then
+      local dir="${BASH_REMATCH[1]}"
+      local file="${BASH_REMATCH[2]}"
+      local full_path="$dir/$file"
+
+      # Determine if it's only in repo or only in home
+      if [[ "$full_path" == "$repo_dir"* ]]; then
+        # Only in repo, offer to copy to home
+        local rel_path="${full_path#$repo_dir}"
+        handle_copy "$full_path" "$home_dir$rel_path" "repository"
+      else
+        # Only in home, offer to copy to repo
+        local rel_path="${full_path#$home_dir}"
+        handle_copy "$full_path" "$repo_dir$rel_path" "home directory"
+      fi
+
+    elif [[ "$line" =~ ^"Files "(.+)" and "(.+)" differ"$ ]]; then
+      local file1="${BASH_REMATCH[1]}"
+      local file2="${BASH_REMATCH[2]}"
+      handle_diff "$file1" "$file2"
+    fi
+  done < <(diff -qrs "$repo_dir" "$home_dir" 2>/dev/null)
+
+  echo
+}
+
+# Compare bin directories
+if [[ -d "bin" && -d "$OTHER_DIR/bin" ]]; then
+  process_diff "$REPO_DIR/bin/" "$OTHER_DIR/bin/"
+fi
+
+# Compare .config directories
+if [[ -d ".config" && -d "$OTHER_DIR/.config" ]]; then
+  process_diff "$REPO_DIR/.config/hiiro/" "$OTHER_DIR/.config/hiiro/"
+fi
+
+echo "========================================="
+echo "Sync complete!"
+echo "========================================="
