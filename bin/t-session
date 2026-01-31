@@ -1,0 +1,63 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+require 'pry'
+require 'rspec'
+
+# $> h session
+#
+#  Subcommand required!
+#
+#  Possible subcommands:
+#    pin       (subcommand)  /Users/unixsuperhero/.config/hiiro/plugins/pins.rb:12
+#    edit      (subcommand)  /Users/unixsuperhero/.rbenv/versions/3.1.2/lib/ruby/gems/3.1.0/gems/hiiro-0.1.8/lib/hiiro.rb:14
+#    ses       (subcommand)  /Users/unixsuperhero/bin/h-session:99
+#    ls        (subcommand)  /Users/unixsuperhero/bin/h-session:111
+#    new       (subcommand)  /Users/unixsuperhero/bin/h-session:115
+#    kill      (subcommand)  /Users/unixsuperhero/bin/h-session:119
+#    attach    (subcommand)  /Users/unixsuperhero/bin/h-session:123
+#    rename    (subcommand)  /Users/unixsuperhero/bin/h-session:127
+#    switch    (subcommand)  /Users/unixsuperhero/bin/h-session:131
+#    detach    (subcommand)  /Users/unixsuperhero/bin/h-session:135
+#    has       (subcommand)  /Users/unixsuperhero/bin/h-session:139
+#    info      (subcommand)  /Users/unixsuperhero/bin/h-session:143
+
+o = Hiiro.init(*ARGV, plugins: [Pins])
+
+o.add_subcmd(:ls) { |*args|
+  system('tmux', 'list-sessions', *args)
+}
+
+o.add_subcmd(:new) { |*args|
+  system('tmux', 'new-session', *args)
+}
+
+o.add_subcmd(:kill) { |*args|
+  system('tmux', 'kill-session', '-t', *args)
+}
+
+o.add_subcmd(:attach) { |*args|
+  system('tmux', 'attach-session', '-t', *args)
+}
+
+o.add_subcmd(:rename) { |*args|
+  system('tmux', 'rename-session', *args)
+}
+
+o.add_subcmd(:switch) { |*args|
+  system('tmux', 'switch-client', '-t', *args)
+}
+
+o.add_subcmd(:detach) { |*args|
+  system('tmux', 'detach-client', *args)
+}
+
+o.add_subcmd(:has) { |*args|
+  system('tmux', 'has-session', *args)
+}
+
+o.add_subcmd(:info) { |*args|
+  system('tmux', 'display-message', '-p', '#{session_name}: #{session_windows} windows, #{session_attached} attached', *args)
+}
+
+o.run

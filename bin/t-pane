@@ -1,0 +1,63 @@
+#!/usr/bin/env ruby
+
+load File.join(Dir.home, 'bin', 'h')
+
+o = Hiiro.init(*ARGV, plugins: [Pins])
+
+o.add_subcmd(:ls) { |*args|
+  system('tmux', 'list-panes', *args)
+}
+
+o.add_subcmd(:lsa) { |*args|
+  system('tmux', 'list-panes', '-a', *args)
+}
+
+o.add_subcmd(:split) { |*args|
+  system('tmux', 'split-window', *args)
+}
+
+o.add_subcmd(:splitv) { |*args|
+  system('tmux', 'split-window', '-v', *args)
+}
+
+o.add_subcmd(:splith) { |*args|
+  system('tmux', 'split-window', '-h', *args)
+}
+
+o.add_subcmd(:kill) { |*args|
+  system('tmux', 'kill-pane', *args)
+}
+
+o.add_subcmd(:swap) { |*args|
+  system('tmux', 'swap-pane', *args)
+}
+
+o.add_subcmd(:zoom) { |*args|
+  system('tmux', 'resize-pane', '-Z', *args)
+}
+
+o.add_subcmd(:capture) { |*args|
+  system('tmux', 'capture-pane', *args)
+}
+
+o.add_subcmd(:select) { |*args|
+  system('tmux', 'select-pane', *args)
+}
+
+o.add_subcmd(:move) { |*args|
+  system('tmux', 'move-pane', *args)
+}
+
+o.add_subcmd(:break) { |*args|
+  system('tmux', 'break-pane', *args)
+}
+
+o.add_subcmd(:join) { |*args|
+  system('tmux', 'join-pane', *args)
+}
+
+o.add_subcmd(:resize) { |*args|
+  system('tmux', 'resize-pane', *args)
+}
+
+o.run

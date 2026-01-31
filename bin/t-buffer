@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+
+require "hiiro"
+
+def find_buffer(partial)
+  buffer_list = `tmux list-buffers`.lines.map{|line| line.split(/:/, 2).first }
+
+  buffer, *other = buffer_list.grep(Regexp.new(partial))
+
+  return nil if other.any?
+
+  buffer
+end
+
+o = Hiiro.init(*ARGV, plugins: [Pins])
+
+o.add_subcmd(:ls) { |*args|
+  system('tmux', 'list-buffers', *args)
+}
+
+o.add_subcmd(:show) { |name, *args|
+  buffer = find_buffer(name)
+
+  system('tmux', 'show-buffer', '-b', buffer, *args)
+}
+
+o.add_subcmd(:save) { |*args|
+  system('tmux', 'save-buffer', *args)
+}
+
+o.add_subcmd(:load) { |*args|
+  system('tmux', 'load-buffer', *args)
+}
+
+o.add_subcmd(:set) { |*args|
+  system('tmux', 'set-buffer', *args)
+}
+
+o.add_subcmd(:paste) { |*args|
+  system('tmux', 'paste-buffer', *args)
+}
+
+o.add_subcmd(:delete) { |*args|
+  system('tmux', 'delete-buffer', *args)
+}
+
+o.add_subcmd(:choose) { |*args|
+  system('tmux', 'choose-buffer', *args)
+}
+
+o.add_subcmd(:clear) { |*args|
+  # Delete all buffers
+  buffers = `tmux list-buffers -F '\#{buffer_name}'`.strip.split("\n")
+  buffers.each { |buf| system('tmux', 'delete-buffer', '-b', buf) }
+  puts "Cleared #{buffers.count} buffers"
+}
+
+o.run
