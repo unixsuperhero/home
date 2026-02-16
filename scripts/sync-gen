@@ -1,0 +1,146 @@
+#!/bin/bash
+
+# Generate a sync script instead of running interactively
+# This script compares bin/ and .config/hiiro/ with their counterparts in $OTHER_DIR
+# and outputs a bash script you can edit before running
+
+set -e
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_DIR"
+
+OTHER_DIR="$HOME"
+OUTPUT_SCRIPT="${1:-/tmp/sync-actions.sh}"
+
+cat > "$OUTPUT_SCRIPT" << 'HEADER'
+#!/bin/bash
+
+# Generated sync script - edit this file to remove unwanted operations
+# Then run it to perform the sync
+
+set -e
+
+# Function to prompt for y/n
+ask_yn() {
+  local prompt="$1"
+  local response
+  read -p "$prompt (y/N): " response </dev/tty
+  [[ "$response" =~ ^[yY]$ ]]
+}
+
+# Copy file with confirmation
+copy_file() {
+  local src="$1"
+  local dst="$2"
+  local label="$3"
+
+  echo
+  echo "==> $label"
+  echo "    From: $src"
+  echo "    To:   $dst"
+  if ask_yn "Copy?"; then
+    mkdir -p "$(dirname "$dst")"
+    cp -v "$src" "$dst"
+    echo "Copied!"
+  else
+    echo "Skipped."
+  fi
+}
+
+# Diff files with confirmation
+diff_files() {
+  local file1="$1"
+  local file2="$2"
+  local label="$3"
+
+  echo
+  echo "==> $label"
+  echo "    Repo: $file1"
+  echo "    Home: $file2"
+  if ask_yn "Open in vim diff?"; then
+    nvim -d "$file1" "$file2" </dev/tty >/dev/tty
+  else
+    echo "Skipped."
+  fi
+}
+
+echo "Running sync actions..."
+echo
+
+# ============================================
+# ACTIONS - Edit below to remove unwanted ops
+# ============================================
+
+HEADER
+
+echo "Generating sync script: $OUTPUT_SCRIPT"
+echo "Repository: $REPO_DIR"
+echo "Other Dir: $OTHER_DIR"
+echo
+
+# Process diff output for a directory pair
+process_diff() {
+  local repo_dir="$1"
+  local home_dir="$2"
+  local section_name="$3"
+
+  echo "# --- $section_name ---" >> "$OUTPUT_SCRIPT"
+  echo "" >> "$OUTPUT_SCRIPT"
+
+  # Use diff -qrs and process line by line
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^"Only in "(.*)":" ]]; then
+      # Parse "Only in /path/to/dir: filename"
+      local dir="${BASH_REMATCH[1]}"
+      local file="${line##*: }"
+      local full_path="$dir/$file"
+
+      # Determine if it's only in repo or only in home
+      if [[ "$full_path" == "$repo_dir"* ]]; then
+        # Only in repo, offer to copy to home
+        local rel_path="${full_path#$repo_dir}"
+        echo "copy_file '$full_path' '$home_dir$rel_path' 'Only in repo: $rel_path'" >> "$OUTPUT_SCRIPT"
+      else
+        # Only in home, offer to copy to repo
+        local rel_path="${full_path#$home_dir}"
+        echo "copy_file '$full_path' '$repo_dir$rel_path' 'Only in home: $rel_path'" >> "$OUTPUT_SCRIPT"
+      fi
+
+    elif [[ "$line" =~ ^"Files "(.+)" and "(.+)" differ"$ ]]; then
+      local file1="${BASH_REMATCH[1]}"
+      local file2="${BASH_REMATCH[2]}"
+      local rel_path="${file1#$repo_dir}"
+      echo "diff_files '$file1' '$file2' 'Different: $rel_path'" >> "$OUTPUT_SCRIPT"
+    fi
+  done < <(diff -qrs "$repo_dir" "$home_dir" 2>/dev/null)
+
+  echo "" >> "$OUTPUT_SCRIPT"
+}
+
+# Compare bin directories
+if [[ -d "bin" && -d "$OTHER_DIR/bin" ]]; then
+  process_diff "$REPO_DIR/bin/" "$OTHER_DIR/bin/" "bin/"
+fi
+
+# Compare .config directories
+if [[ -d ".config" && -d "$OTHER_DIR/.config" ]]; then
+  process_diff "$REPO_DIR/.config/hiiro/" "$OTHER_DIR/.config/hiiro/" ".config/hiiro/"
+fi
+
+cat >> "$OUTPUT_SCRIPT" << 'FOOTER'
+echo
+echo "========================================="
+echo "Sync complete!"
+echo "========================================="
+FOOTER
+
+chmod +x "$OUTPUT_SCRIPT"
+
+echo "========================================="
+echo "Generated: $OUTPUT_SCRIPT"
+echo "========================================="
+echo
+echo "Next steps:"
+echo "  1. Edit $OUTPUT_SCRIPT to remove unwanted operations"
+echo "  2. Run: $OUTPUT_SCRIPT"
+echo

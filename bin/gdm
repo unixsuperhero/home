@@ -1,0 +1,22 @@
+#!/bin/bash
+
+function log_since_fork_point() {
+  branch=$1
+
+  fp=$(git merge-base --fork-point $1)
+
+  test $? -ne 0 && return 1
+
+  git diff --name-only ${fp}
+}
+
+base_branch="${1:-origin/$(git master)}"
+base_no_origin="${base_branch#origin/}"
+
+log_since_fork_point $base_branch
+
+if [[ $? -ne 0 ]]
+then
+  log_since_fork_point $base_no_origin
+fi
+

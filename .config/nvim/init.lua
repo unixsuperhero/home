@@ -315,6 +315,14 @@ vim.o.splitbelow = true
 -- See `:help vim.keymap.set()`
 vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true })
 
+local normal_map = function(keys, func, desc)
+  vim.keymap.set('n', keys, func, { buffer = bufnr, desc = desc })
+end
+
+local visual_map = function(keys, func, desc)
+  vim.keymap.set('v', keys, func, { buffer = bufnr, desc = desc })
+end
+
 -- Remap for dealing with word wrap
 vim.keymap.set('n', 'k', "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true })
 vim.keymap.set('n', 'j', "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true })
@@ -335,8 +343,16 @@ vim.keymap.set('n', '<leader>e', ':e <c-r>=expand("%:h")<cr>/')
 vim.keymap.set('n', '<leader>s', ':sp <c-r>=expand("%:h")<cr>/')
 vim.keymap.set('n', '<leader>v', ':vs <c-r>=expand("%:h")<cr>/')
 vim.keymap.set('n', '<leader>q', ':q<cr>')
-vim.keymap.set('n', 'cob', ':set buftype=nofile<cr>')
-vim.keymap.set('n', 'coB', ':set buftype=<cr>')
+
+local function toggle_buftype()
+  if vim.bo.buftype == 'nofile' then
+    vim.bo.buftype = ''
+  else
+    vim.bo.buftype = 'nofile'
+  end
+end
+
+normal_map('cob', toggle_buftype, 'toggle buftype option between nothing and nofile')
 vim.keymap.set('n', 'cow', ':set invwrap<cr>')
 vim.keymap.set('n', ',t', ':sp|wincmd J<cr>:let @j="bundle exec rspec " . @%<cr>:term<cr>"jpa<cr>')
 vim.keymap.set('n', ',T', ':sp|wincmd J<cr>:let @j="bundle exec rspec " . @% . ":" . line(".")<cr>:term<cr>"jpa<cr>')
@@ -373,6 +389,70 @@ end
 vim.keymap.set('n', ',r', ShowFileStructure)
 vim.keymap.set('n', ',R', ShowTestFileStructure)
 vim.keymap.set('n', ',L', ShowTestFileStructureWithLet)
+
+function GetTextWidth()
+  local win_id = vim.fn.win_getid()
+  local win_width = vim.api.nvim_win_get_width(0)
+  local wininfo = vim.fn.getwininfo(win_id)[1]
+  local textoff = wininfo.textoff
+  return win_width - textoff
+end
+
+function ShowWindowWidth()
+  local win_id = vim.fn.win_getid()
+  local win_width = vim.api.nvim_win_get_width(0)
+  local wininfo = vim.fn.getwininfo(win_id)[1]
+  local textoff = wininfo.textoff
+  local text_width = win_width - textoff
+
+  vim.cmd('echom "win_id: ' .. win_id .. '"')
+  vim.cmd('echom "win_width: ' .. win_width .. '"')
+  vim.cmd('echom "textoff: ' .. textoff .. ' (signcolumn, number, fold columns)"')
+  vim.cmd('echom "text_width: ' .. text_width .. ' (usable text area)"')
+end
+
+vim.keymap.set('n', ',w', ShowWindowWidth, { desc = 'Show window width info' })
+
+function WrapBufferToWindow()
+  local text_width = GetTextWidth()
+  local original_tw = vim.bo.textwidth
+  local cword = vim.fn.expand('<cWORD>')
+  local original_line = vim.api.nvim_win_get_cursor(0)[1]
+
+  vim.bo.textwidth = text_width
+
+  -- Wrap current line first
+  vim.cmd('normal! gw$')
+
+  -- Search for cWORD starting from original line
+  vim.api.nvim_win_set_cursor(0, {original_line, 0})
+  local found = vim.fn.search('\\V' .. vim.fn.escape(cword, '\\'), 'cW')
+
+  local target_line_text = nil
+  local col_in_target = nil
+
+  if found > 0 then
+    target_line_text = vim.api.nvim_get_current_line()
+    col_in_target = vim.fn.col('.') - 1
+  end
+
+  -- Now wrap the whole buffer
+  vim.cmd('normal! gggwG')
+
+  -- Find the target line and restore position
+  if target_line_text then
+    vim.cmd('normal! gg')
+    local line_found = vim.fn.search('\\V' .. vim.fn.escape(target_line_text, '\\'), 'cW')
+    if line_found > 0 and col_in_target then
+      vim.api.nvim_win_set_cursor(0, {line_found, col_in_target})
+    end
+  end
+
+  vim.bo.textwidth = original_tw
+  vim.cmd('echom "Wrapped buffer to ' .. text_width .. ' columns"')
+end
+
+vim.api.nvim_create_user_command('WrapBuffer', WrapBufferToWindow, {})
 
 -- [[ Highlight on yank ]]
 -- See `:help vim.highlight.on_yank()`
@@ -799,5 +879,12 @@ vim.api.nvim_create_user_command("T", bottom_split_terminal, {})
 vim.api.nvim_create_user_command("Lsl", Ls_l, { nargs = "*"})
 vim.api.nvim_create_user_command("CopyLink", copy_github_link, { nargs = "*"})
 vim.api.nvim_create_user_command("OpenLink", open_github_link, { nargs = "*"})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "ruby",
+  callback = function()
+    vim.bo.makeprg = "ruby -c %"
+  end,
+})
 
 -- vim: ts=2 sts=2 sw=2 et
