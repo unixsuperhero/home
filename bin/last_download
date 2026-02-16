@@ -1,0 +1,5 @@
+#!/bin/bash
+
+last_file="$(ls -1tr $HOME/Downloads | tail -1)"
+echo -n "${HOME}/Downloads/${last_file}"
+

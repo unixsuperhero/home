@@ -1,0 +1,273 @@
+#!/usr/bin/env ruby
+
+require 'hiiro'
+
+tm = Hiiro::TodoManager.new
+o = Hiiro.init(*ARGV, todo_file: tm.todo_file)
+
+o.add_subcmd(:ls) do |*args|
+  show_all = args.delete('-a') || args.delete('--all')
+  status_filter = nil
+  tag_filter = nil
+  task_filter = nil
+
+  while args.any?
+    arg = args.shift
+    case arg
+    when '-s', '--status'
+      status_filter = args.shift
+    when '-t', '--tag'
+      tag_filter = args.shift
+    when '--task'
+      task_filter = args.shift
+    end
+  end
+
+  items = if status_filter
+    tm.filter_by_status(*status_filter.split(','))
+  elsif tag_filter
+    tm.filter_by_tag(tag_filter)
+  elsif task_filter
+    tm.filter_by_task(task_filter)
+  elsif show_all
+    tm.all
+  else
+    tm.active
+  end
+
+  if items.empty?
+    puts "No todo items found."
+  else
+    puts tm.list(items)
+  end
+end
+
+o.add_subcmd(:list) do |*args|
+  o.run_subcmd(:ls, *args)
+end
+
+o.add_subcmd(:add) do |*args|
+  if args.empty?
+    new_items = tm.edit_items
+    if new_items.empty?
+      puts "No items added."
+      next
+    end
+
+    tm.add_items(new_items)
+    if new_items.length == 1
+      puts "Added: #{tm.format_item(new_items.first)}"
+    else
+      puts "Added #{new_items.length} items:"
+      new_items.each { |item| puts "  #{tm.format_item(item)}" }
+    end
+    next
+  end
+
+  tags = nil
+  text_parts = []
+
+  while args.any?
+    arg = args.shift
+    case arg
+    when '-t', '--tags'
+      tags = args.shift
+    else
+      text_parts << arg
+    end
+  end
+
+  text = text_parts.join(' ')
+  if text.empty?
+    puts "Usage: h todo add <text> [-t tags]"
+    exit 1
+  end
+
+  item = tm.add(text, tags: tags)
+  puts "Added: #{tm.format_item(item)}"
+end
+
+o.add_subcmd(:rm) do |*args|
+  id_or_index = args.shift
+  if id_or_index.nil?
+    puts "Usage: h todo rm <id|index>"
+    exit 1
+  end
+
+  item = tm.remove(id_or_index)
+  if item
+    puts "Removed: #{item.text}"
+  else
+    puts "Item not found: #{id_or_index}"
+    exit 1
+  end
+end
+
+o.add_subcmd(:remove) do |*args|
+  o.run_subcmd(:rm, *args)
+end
+
+o.add_subcmd(:change) do |*args|
+  id_or_index = args.shift
+  if id_or_index.nil?
+    puts "Usage: h todo change <id|index> [--text TEXT] [--tags TAGS] [--status STATUS]"
+    exit 1
+  end
+
+  text = nil
+  tags = nil
+  status = nil
+
+  while args.any?
+    arg = args.shift
+    case arg
+    when '--text'
+      text = args.shift
+    when '--tags', '-t'
+      tags = args.shift
+    when '--status', '-s'
+      status = args.shift
+    else
+      text ||= ''
+      text = [text, arg, *args].join(' ').strip
+      break
+    end
+  end
+
+  item = tm.change(id_or_index, text: text, tags: tags, status: status)
+  if item
+    puts "Updated: #{tm.format_item(item)}"
+  else
+    puts "Item not found: #{id_or_index}"
+    exit 1
+  end
+end
+
+o.add_subcmd(:start) do |*args|
+  id_or_index = args.shift
+  if id_or_index.nil?
+    puts "Usage: h todo start <id|index>"
+    exit 1
+  end
+
+  item = tm.start(id_or_index)
+  if item
+    puts "Started: #{tm.format_item(item)}"
+  else
+    puts "Item not found: #{id_or_index}"
+    exit 1
+  end
+end
+
+o.add_subcmd(:done) do |*args|
+  id_or_index = args.shift
+  if id_or_index.nil?
+    puts "Usage: h todo done <id|index>"
+    exit 1
+  end
+
+  item = tm.done(id_or_index)
+  if item
+    puts "Done: #{tm.format_item(item)}"
+  else
+    puts "Item not found: #{id_or_index}"
+    exit 1
+  end
+end
+
+o.add_subcmd(:skip) do |*args|
+  id_or_index = args.shift
+  if id_or_index.nil?
+    puts "Usage: h todo skip <id|index>"
+    exit 1
+  end
+
+  item = tm.skip(id_or_index)
+  if item
+    puts "Skipped: #{tm.format_item(item)}"
+  else
+    puts "Item not found: #{id_or_index}"
+    exit 1
+  end
+end
+
+o.add_subcmd(:reset) do |*args|
+  id_or_index = args.shift
+  if id_or_index.nil?
+    puts "Usage: h todo reset <id|index>"
+    exit 1
+  end
+
+  item = tm.reset(id_or_index)
+  if item
+    puts "Reset: #{tm.format_item(item)}"
+  else
+    puts "Item not found: #{id_or_index}"
+    exit 1
+  end
+end
+
+o.add_subcmd(:search) do |*args|
+  query = args.join(' ')
+  if query.empty?
+    puts "Usage: h todo search <query>"
+    exit 1
+  end
+
+  items = tm.search(query)
+  if items.empty?
+    puts "No items matching: #{query}"
+  else
+    puts tm.list(items)
+  end
+end
+
+o.add_subcmd(:path) do |*args|
+  print tm.todo_file
+end
+
+o.add_subcmd(:editall) do |*args|
+  editor = ENV['EDITOR'] || 'safe_nvim' || 'nvim'
+  system(editor, tm.todo_file)
+end
+
+o.add_subcmd(:help) do |*args|
+  puts <<~HELP
+    Usage: h todo <command> [args]
+
+    Commands:
+      ls, list              List todo items (active by default)
+        -a, --all           Show all items including done/skip
+        -s, --status STATUS Filter by status (not_started,started,done,skip)
+        -t, --tag TAG       Filter by tag
+        --task TASK         Filter by task name
+
+      add [text] [-t tags]  Add todo item(s)
+                            With no args, opens editor for YAML input
+
+      rm, remove <id|index> Remove a todo item
+
+      change <id|index>     Modify a todo item
+        --text TEXT         New text
+        --tags TAGS         New tags
+        --status STATUS     New status
+
+      start <id|index>      Mark item as started
+      done <id|index>       Mark item as done
+      skip <id|index>       Mark item as skipped
+      reset <id|index>      Reset item to not_started
+
+      search <query>        Search items by text, tags, or task
+
+      path                  Print path to todo.yml
+      editall               Open todo.yml in editor
+
+    Status icons:
+      [ ] not_started
+      [>] started
+      [x] done
+      [-] skip
+  HELP
+end
+
+o.run

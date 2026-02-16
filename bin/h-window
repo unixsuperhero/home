@@ -79,6 +79,7 @@ Hiiro.run(*ARGV, plugins: [Pins]) do
       target = fuzzyfind_from_map(tmux.windows(all: true).name_map)
     end
 
+<<<<<<< HEAD
     if target
       tmux.open_session(target)
     end
@@ -134,3 +135,29 @@ Hiiro.run(*ARGV, plugins: [Pins]) do
     end
   }
 end
+||||||| parent of 58b31f6 (update files.  bin/last_download is a huge improvement)
+o.run
+=======
+o.add_subcmd(:select) do |*args|
+  # Get all windows with details
+  output = `tmux list-windows -a -F '\#{session_name}:\#{window_index} \#{window_name} [\#{window_panes} panes]'`.strip
+
+  if output.empty?
+    STDERR.puts "No windows found"
+    next
+  end
+
+  lines = output.split("\n").each_with_object({}) do |line, h|
+    window_id = line.split.first
+    h[line] = window_id
+  end
+
+  selected = o.fuzzyfind_from_map(lines)
+
+  if selected
+    print selected
+  end
+end
+
+o.run
+>>>>>>> 58b31f6 (update files.  bin/last_download is a huge improvement)

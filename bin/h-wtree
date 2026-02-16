@@ -12,5 +12,27 @@ Hiiro.run(*ARGV) do |h|
   h.add_subcmd(:remove)  { |*args| system('git', 'worktree', 'remove', *args) }
   h.add_subcmd(:repair)  { |*args| system('git', 'worktree', 'repair', *args) }
   h.add_subcmd(:unlock)  { |*args| system('git', 'worktree', 'unlock', *args) }
+
+  h.add_subcmd(:select) do |*args|
+    # Get worktree list
+    output = `git worktree list`.strip
+
+    if output.empty?
+      STDERR.puts "No worktrees found"
+      next
+    end
+
+    lines = output.split("\n").each_with_object({}) do |line, hash|
+      # Format: /path/to/worktree  sha [branch]
+      path = line.split.first
+      hash[line] = path
+    end
+
+    selected = h.fuzzyfind_from_map(lines)
+
+    if selected
+      print selected
+    end
+  end
 end
 

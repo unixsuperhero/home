@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+
+require "hiiro"
+require "fileutils"
+
+hiiro = Hiiro.init(*ARGV, cwd: Dir.pwd, plugins: [Tasks])
+
+hiiro.add_subcommand(:version) { |*args|
+  puts Hiiro::VERSION
+}
+
+hiiro.add_subcommand(:ping) { |*args|
+  puts "pong"
+}
+
+hiiro.add_subcommand(:setup) do |*args|
+  gem_root = File.expand_path("../..", __FILE__)
+  source_plugins = File.join(gem_root, "plugins")
+  source_bins = File.join(gem_root, "bin")
+  dest_plugins = File.expand_path("~/.config/hiiro/plugins")
+  dest_bin = File.expand_path("~/bin")
+
+  FileUtils.mkdir_p(dest_plugins)
+  FileUtils.mkdir_p(dest_bin)
+
+  # Copy plugins
+  plugin_files = Dir["#{source_plugins}/*.rb"]
+  if plugin_files.any?
+    FileUtils.cp(plugin_files, dest_plugins)
+    puts "Installed #{plugin_files.size} plugins to #{dest_plugins}"
+    plugin_files.each { |f| puts "  - #{File.basename(f)}" }
+  else
+    puts "No plugins found in #{source_plugins}"
+  end
+
+  puts
+
+  # Copy bin scripts
+  bin_files = Dir["#{source_bins}/h-*"]
+  if bin_files.any?
+    FileUtils.cp(bin_files, dest_bin)
+    bin_files.each { |f| FileUtils.chmod(0755, File.join(dest_bin, File.basename(f))) }
+    puts "Installed #{bin_files.size} subcommands to #{dest_bin}"
+    bin_files.each { |f| puts "  - #{File.basename(f)}" }
+  else
+    puts "No subcommands found in #{source_bins}"
+  end
+
+  puts
+  puts "Setup complete! Make sure ~/bin is in your PATH."
+end
+
+hiiro.run

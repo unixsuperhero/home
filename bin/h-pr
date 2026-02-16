@@ -804,10 +804,231 @@ hiiro.add_subcmd(:link) { |*args|
 
 hiiro.add_subcmd(:edit) { system(ENV['EDITOR'] || 'nvim', __FILE__) }
 hiiro.add_subcmd(:save) { |pr_number=nil| manager.save(pr_number) }
-hiiro.add_subcmd(:history) { |*args| manager.history(args) }
 hiiro.add_subcmd(:current) { manager.current }
 hiiro.add_subcmd(:open) { |pr_number=nil| manager.open(pr_number) }
 hiiro.add_subcmd(:view) { |pr_number=nil| manager.view(pr_number) }
+
+hiiro.add_subcmd(:select) do |*args|
+  # Get my open PRs
+  output = `gh pr list --author @me --state open --json number,title,headRefName 2>/dev/null`.strip
+
+  if output.empty?
+    STDERR.puts "No open PRs found"
+    next
+  end
+
+  prs = JSON.parse(output) rescue []
+  if prs.empty?
+    STDERR.puts "No open PRs found"
+    next
+  end
+
+  lines = prs.each_with_object({}) do |pr, h|
+    display = "##{pr['number']} [#{pr['headRefName']}] #{pr['title']}"
+    h[display] = pr['number'].to_s
+  end
+
+  selected = hiiro.fuzzyfind_from_map(lines)
+
+  if selected
+    print selected
+  end
+end
+
+# === PR Pinning ===
+
+pinned_manager = PinnedPRManager.new
+
+hiiro.add_subcmd(:pin) do |ref = nil, *args|
+  pr_info = nil
+
+  case ref
+  when '-', nil
+    if ref == '-'
+      # Pin current branch's PR
+      pr_info = pinned_manager.fetch_current_branch_pr
+      unless pr_info
+        puts "No PR found for current branch"
+        next
+      end
+    else
+      # Select from my PRs
+      my_prs = pinned_manager.fetch_my_prs
+      if my_prs.empty?
+        puts "No open PRs found"
+        next
+      end
+
+      lines = my_prs.each_with_object({}) do |pr, h|
+        display = "##{pr['number']} [#{pr['headRefName']}] #{pr['title']}"
+        h[display] = pr
+      end
+
+      pr_info = hiiro.fuzzyfind_from_map(lines)
+      unless pr_info
+        puts "No PR selected"
+        next
+      end
+    end
+  when /^\d+$/
+    # Pin by PR number
+    pr_info = pinned_manager.fetch_pr_info(ref)
+    unless pr_info
+      puts "PR ##{ref} not found"
+      next
+    end
+  else
+    puts "Usage: h pr pin [-|PR_NUMBER]"
+    puts "  -       Pin current branch's PR"
+    puts "  <num>   Pin PR by number"
+    puts "  (none)  Select from your open PRs"
+    next
+  end
+
+  pinned_manager.pin(pr_info)
+  puts "Pinned PR ##{pr_info['number']}: #{pr_info['title']}"
+end
+
+hiiro.add_subcmd(:unpin) do |ref = nil, *args|
+  pinned = pinned_manager.load_pinned
+
+  if pinned.empty?
+    puts "No pinned PRs"
+    next
+  end
+
+  pr_number = nil
+
+  if ref.nil?
+    # Select from pinned PRs
+    lines = pinned.each_with_index.each_with_object({}) do |(pr, idx), h|
+      h[pinned_manager.display_pinned(pr, idx)] = pr['number'].to_s
+    end
+
+    pr_number = hiiro.fuzzyfind_from_map(lines)
+    unless pr_number
+      puts "No PR selected"
+      next
+    end
+  elsif ref =~ /^\d+$/
+    pr_number = ref
+  else
+    puts "Usage: h pr unpin [PR_NUMBER]"
+    next
+  end
+
+  if pinned_manager.unpin(pr_number)
+    puts "Unpinned PR ##{pr_number}"
+  else
+    puts "PR ##{pr_number} was not pinned"
+  end
+end
+
+hiiro.add_subcmd(:pinned) do |*args|
+  pinned = pinned_manager.load_pinned
+
+  if pinned.empty?
+    puts "No pinned PRs"
+    next
+  end
+
+  puts "Pinned PRs:"
+  puts
+
+  pinned.each_with_index do |pr, idx|
+    puts pinned_manager.display_pinned(pr, idx)
+  end
+end
+
+hiiro.add_subcmd(:status) do |*args|
+  pinned = pinned_manager.load_pinned
+
+  if pinned.empty?
+    puts "No pinned PRs"
+    next
+  end
+
+  compact = args.include?('-c') || args.include?('--compact')
+
+  puts "Refreshing status for #{pinned.length} pinned PR(s)..."
+  puts
+
+  pinned.each_with_index do |pr, idx|
+    pinned_manager.refresh_status(pr)
+    if compact
+      puts pinned_manager.display_pinned(pr, idx)
+    else
+      puts pinned_manager.display_detailed(pr, idx)
+      puts
+    end
+  end
+
+  pinned_manager.save_pinned(pinned)
+  puts "---"
+  puts "Status updated at #{Time.now.strftime('%H:%M:%S')}"
+end
+
+hiiro.add_subcmd(:'suggest-unpin') do |*args|
+  pinned = pinned_manager.load_pinned
+
+  if pinned.empty?
+    puts "No pinned PRs"
+    next
+  end
+
+  # Refresh all statuses first
+  pinned.each { |pr| pinned_manager.refresh_status(pr) }
+  pinned_manager.save_pinned(pinned)
+
+  merged = pinned.select { |pr| pr['state'] == 'MERGED' }
+  closed = pinned.select { |pr| pr['state'] == 'CLOSED' }
+
+  if merged.empty? && closed.empty?
+    puts "No merged or closed PRs to unpin"
+    next
+  end
+
+  puts "PRs that can be unpinned:"
+  puts
+
+  (merged + closed).each_with_index do |pr, idx|
+    puts pinned_manager.display_pinned(pr, idx)
+  end
+
+  puts
+  puts "Run 'h pr auto-unpin' to unpin all merged/closed PRs"
+end
+
+hiiro.add_subcmd(:'auto-unpin') do |*args|
+  pinned = pinned_manager.load_pinned
+
+  if pinned.empty?
+    puts "No pinned PRs"
+    next
+  end
+
+  # Refresh all statuses first
+  pinned.each { |pr| pinned_manager.refresh_status(pr) }
+
+  merged_or_closed = pinned.select { |pr| pr['state'] == 'MERGED' || pr['state'] == 'CLOSED' }
+
+  if merged_or_closed.empty?
+    puts "No merged or closed PRs to unpin"
+    pinned_manager.save_pinned(pinned)
+    next
+  end
+
+  puts "Unpinning #{merged_or_closed.length} merged/closed PR(s):"
+  puts
+
+  merged_or_closed.each do |pr|
+    puts "  ##{pr['number']}: #{pr['title']} [#{pr['state']}]"
+    pinned_manager.unpin(pr['number'])
+  end
+
+  puts
+  puts "Done. #{pinned_manager.load_pinned.length} PR(s) still pinned."
+end
 
 # hiiro.add_default { manager.help }
 
