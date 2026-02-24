@@ -1,63 +1,160 @@
 #!/usr/bin/env ruby
 
-load File.join(Dir.home, 'bin', 'h')
+require 'hiiro'
 
-o = Hiiro.init(*ARGV, plugins: [Pins])
+Hiiro.run(*ARGV, plugins: [Pins]) do
+  tmux = tmux_client
 
-o.add_subcmd(:ls) { |*args|
-  system('tmux', 'list-panes', *args)
-}
+  add_subcmd(:ls) { |*args|
+    if args.empty?
+      tmux.panes.each { |p| puts p.to_s }
+    else
+      system('tmux', 'list-panes', *args)
+    end
+  }
 
-o.add_subcmd(:lsa) { |*args|
-  system('tmux', 'list-panes', '-a', *args)
-}
+  add_subcmd(:lsa) { |*args|
+    if args.empty?
+      tmux.panes(all: true).each { |p| puts p.to_s }
+    else
+      system('tmux', 'list-panes', '-a', *args)
+    end
+  }
 
-o.add_subcmd(:split) { |*args|
-  system('tmux', 'split-window', *args)
-}
+  add_subcmd(:split) { |*args|
+    system('tmux', 'split-window', *args)
+  }
 
-o.add_subcmd(:splitv) { |*args|
-  system('tmux', 'split-window', '-v', *args)
-}
+  add_subcmd(:splitv) { |*args|
+    if args.empty?
+      tmux.split_window(horizontal: false)
+    else
+      system('tmux', 'split-window', '-v', *args)
+    end
+  }
 
-o.add_subcmd(:splith) { |*args|
-  system('tmux', 'split-window', '-h', *args)
-}
+  add_subcmd(:splith) { |*args|
+    if args.empty?
+      tmux.split_window(horizontal: true)
+    else
+      system('tmux', 'split-window', '-h', *args)
+    end
+  }
 
-o.add_subcmd(:kill) { |*args|
-  system('tmux', 'kill-pane', *args)
-}
+  add_subcmd(:kill) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.panes(all: true).name_map)
+    end
 
-o.add_subcmd(:swap) { |*args|
-  system('tmux', 'swap-pane', *args)
-}
+    if target && args.empty?
+      tmux.kill_pane(target)
+    elsif target
+      system('tmux', 'kill-pane', '-t', target, *args)
+    end
+  }
 
-o.add_subcmd(:zoom) { |*args|
-  system('tmux', 'resize-pane', '-Z', *args)
-}
+  add_subcmd(:swap) { |*args|
+    system('tmux', 'swap-pane', *args)
+  }
 
-o.add_subcmd(:capture) { |*args|
-  system('tmux', 'capture-pane', *args)
-}
+  add_subcmd(:zoom) { |target = nil, *args|
+    if args.empty?
+      tmux.resize_pane(target: target, zoom: true)
+    else
+      system('tmux', 'resize-pane', '-Z', *[target && "-t", target, *args].compact)
+    end
+  }
 
-o.add_subcmd(:select) { |*args|
-  system('tmux', 'select-pane', *args)
-}
+  add_subcmd(:capture) { |*args|
+    if args.empty?
+      content = tmux.capture_pane
+      print content if content
+    else
+      system('tmux', 'capture-pane', *args)
+    end
+  }
 
-o.add_subcmd(:move) { |*args|
-  system('tmux', 'move-pane', *args)
-}
+  add_subcmd(:select) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.panes(all: true).name_map)
+    end
 
-o.add_subcmd(:break) { |*args|
-  system('tmux', 'break-pane', *args)
-}
+    if target
+      print target
+    end
+  }
 
-o.add_subcmd(:join) { |*args|
-  system('tmux', 'join-pane', *args)
-}
+  add_subcmd(:copy) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.panes(all: true).name_map)
+    end
 
-o.add_subcmd(:resize) { |*args|
-  system('tmux', 'resize-pane', *args)
-}
+    if target
+      Hiiro::Shell.pipe(target, 'pbcopy')
+      puts "Copied pane '#{target}' to clipboard"
+    end
+  }
 
-o.run
+  add_subcmd(:sw, :switch) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.panes(all: true).name_map)
+    end
+
+    if target
+      tmux.open_session(target)
+    end
+  }
+
+  add_subcmd(:move) { |*args|
+    system('tmux', 'move-pane', *args)
+  }
+
+  add_subcmd(:break) { |*args|
+    if args.empty?
+      tmux.break_pane
+    else
+      system('tmux', 'break-pane', *args)
+    end
+  }
+
+  add_subcmd(:join) { |*args|
+    system('tmux', 'join-pane', *args)
+  }
+
+  add_subcmd(:resize) { |*args|
+    system('tmux', 'resize-pane', *args)
+  }
+
+  add_subcmd(:width) { |size, target = nil, *args|
+    if target.nil? && args.empty?
+      tmux.resize_pane(width: size)
+    else
+      system('tmux', 'resize-pane', '-x', size, *[target && "-t", target, *args].compact)
+    end
+  }
+
+  add_subcmd(:height) { |size, target = nil, *args|
+    if target.nil? && args.empty?
+      tmux.resize_pane(height: size)
+    else
+      system('tmux', 'resize-pane', '-y', size, *[target && "-t", target, *args].compact)
+    end
+  }
+
+  add_subcmd(:info) { |target = nil|
+    pane = if target
+      tmux.panes(all: true).find { |p| p.id == target }
+    else
+      tmux.current_pane
+    end
+
+    if pane
+      puts pane.to_s
+      puts "  Size: #{pane.width}x#{pane.height}"
+      puts "  Command: #{pane.command}"
+      puts "  Path: #{pane.path}"
+    else
+      puts "Pane not found"
+    end
+  }
+end

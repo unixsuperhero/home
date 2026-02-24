@@ -2,7 +2,7 @@
 
 module Project
   def self.load(hiiro)
-    hiiro.load_plugin(Tmux)
+    # hiiro.load_plugin(Tmux)
     attach_methods(hiiro)
     add_subcommands(hiiro)
   end

@@ -1,106 +1,99 @@
-#!/bin/bash
+#!/usr/bin/env ruby
 
-# Compare directories interactively
-# This script compares bin/ and .config/hiiro/ with their counterparts in $OTHER_DIR
+require 'json'
+require 'shellwords'
 
-set -e
+repo_root = `git rev-parse --show-toplevel`.chomp
 
-REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$REPO_DIR"
+Dir.chdir(repo_root)
 
-OTHER_DIR="$HOME"
+all = Dir.glob('{.,}*').reject do |f|
+  %w[. .DS_Store .git .gitignore scripts tmp].include?(f)
+end
 
-echo "Comparing directories with ../home/"
-echo "Repository: $REPO_DIR ($0)"
-echo "Other Dir: $OTHER_DIR"
-echo
+grouped = all.group_by { |f| File.file?(f) }
 
-# Function to prompt for y/n
-ask_yn() {
-  local prompt="$1"
-  local response
-  read -p "$prompt (y/N): " response </dev/tty
-  [[ "$response" =~ ^[yY]$ ]]
-}
+files = grouped[true]
 
-# Function to copy file with confirmation
-handle_copy() {
-  local src="$1"
-  local dst="$2"
-  local direction="$3"
+dirs = grouped[false]
 
-  echo
-  echo "File only in $direction: $src"
-  if ask_yn "Copy to $dst?"; then
-    mkdir -p "$(dirname "$dst")"
-    cp -v "$src" "$dst"
-    echo "Copied!"
-  else
-    echo "Skipped."
-  fi
-}
+puts
+puts "FILES\n-----\n"
 
-# Function to diff files with confirmation
-handle_diff() {
-  local file1="$1"
-  local file2="$2"
+puts files
 
-  echo
-  echo "DIFFERENT: $file1 <=> $file2"
-  if ask_yn "Open in vim diff?"; then
-    nvim -d "$file1" "$file2" </dev/tty >/dev/tty
-  else
-    echo "Skipped."
-  fi
-}
+diffs = { not_in_home: [], not_in_repo: [], diff: [] }
 
-# Process diff output for a directory pair
-process_diff() {
-  local repo_dir="$1"
-  local home_dir="$2"
+files.each do |f|
+  b = File.basename(f)
+  h = File.join(Dir.home, b)
 
-  echo "========================================="
-  echo "Comparing: $repo_dir <=> $home_dir"
-  echo "========================================="
+  unless File.exist?(h)
+    diffs[:not_in_home] << [f, h]
+    next
+  end
 
-  # Use diff -qrs and process line by line
-  while IFS= read -r line; do
-    if [[ "$line" =~ ^"Only in "(.*)": "(.*) ]]; then
-      local dir="${BASH_REMATCH[1]}"
-      local file="${BASH_REMATCH[2]}"
-      local full_path="$dir/$file"
+  unless system('diff', '-q', f, h)
+    diffs[:diff] << [h, f]
+  end
+end
 
-      # Determine if it's only in repo or only in home
-      if [[ "$full_path" == "$repo_dir"* ]]; then
-        # Only in repo, offer to copy to home
-        local rel_path="${full_path#$repo_dir}"
-        handle_copy "$full_path" "$home_dir$rel_path" "repository"
-      else
-        # Only in home, offer to copy to repo
-        local rel_path="${full_path#$home_dir}"
-        handle_copy "$full_path" "$repo_dir$rel_path" "home directory"
-      fi
+puts
+puts "DIRS\n-----\n"
 
-    elif [[ "$line" =~ ^"Files "(.+)" and "(.+)" differ"$ ]]; then
-      local file1="${BASH_REMATCH[1]}"
-      local file2="${BASH_REMATCH[2]}"
-      handle_diff "$file1" "$file2"
-    fi
-  done < <(diff -qrs "$repo_dir" "$home_dir" 2>/dev/null)
+puts dirs
 
-  echo
-}
+dirs.each do |dir|
+  lines = `diff -qrs #{dir} ~/#{dir}`.lines(chomp: true)
 
-# Compare bin directories
-if [[ -d "bin" && -d "$OTHER_DIR/bin" ]]; then
-  process_diff "$REPO_DIR/bin/" "$OTHER_DIR/bin/"
-fi
+  lines.each do |line|
+    case line
+    in /identical/
+      next
+    in /Only in #{Dir.home}\/([^:]*):\s*(\S.*)/
+      diffs[:not_in_repo] << [
+        File.join(Dir.home, $1, $2),
+        File.join($1, $2),
+      ]
+    in /Only in ([^:]*):\s*(\S.*)/
+      diffs[:not_in_home] << [
+        File.join($1, $2),
+        File.join(Dir.home, $1, $2),
+      ]
+    in /Files (.*) and (.*) differ/
+      diffs[:diff] << [$1, $2]
+    else
+      puts "ELSE #{line}"
+    end
+  end
+end
 
-# Compare .config directories
-if [[ -d ".config" && -d "$OTHER_DIR/.config" ]]; then
-  process_diff "$REPO_DIR/.config/hiiro/" "$OTHER_DIR/.config/hiiro/"
-fi
 
-echo "========================================="
-echo "Sync complete!"
-echo "========================================="
+
+File.write 'sync.json', JSON.pretty_generate(diffs)
+
+script = ["#!/bin/bash" ,'']
+
+diffs[:not_in_repo].each do |args|
+  dirname = File.dirname(args.last)
+
+  unless Dir.exist?(dirname)
+    script << ''
+    script << format('mkdir -pv %s', dirname.shellescape)
+  end
+
+  script << format('cp -v %s %s', *args.map(&:shellescape))
+end
+
+script << ''
+
+diffs[:diff].each do |args|
+  args = args.reverse unless File.absolute_path?(args.first)
+  script << format('vim -d %s %s', *args.map(&:shellescape))
+end
+
+File.unlink('sync.sh') if File.exist?('sync.sh')
+File.write('sync.sh', script.join("\n"))
+
+File.chmod(777, 'sync.sh')
+

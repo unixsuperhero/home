@@ -53,27 +53,27 @@ module Pins
       value
     end
 
+    def search(partial)
+      Hiiro::Matcher.by_prefix(pins.keys.map(&:to_s), partial)
+    end
+
     def find(partial)
-      pins.keys.map(&:to_s).find do |pin_name|
-        pin_name.start_with?(partial)
-      end
+      search(partial).first&.item
     end
 
     def find_all(partial)
-      pins.keys.map(&:to_s).select do |pin_name|
-        pin_name.start_with?(partial)
-      end
+      search(partial).matches.map(&:item)
     end
 
     def remove(name)
-      all_matches = find_all(name)
+      result = search(name)
 
-      if all_matches.count > 1
-        puts "Unable to remove pin.  Multiple matches: #{all_matches.inspect}"
+      if result.ambiguous?
+        puts "Unable to remove pin.  Multiple matches: #{result.matches.map(&:item).inspect}"
         return
       end
 
-      pin_name = all_matches.first
+      pin_name = result.match&.item
 
       pins.delete(pin_name.to_s)
     end

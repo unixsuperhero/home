@@ -2,7 +2,9 @@ setopt EXTENDED_GLOB
 setopt PROMPT_VARS
 disable -p '#'
 
-export WORDCHARS="${WORDCHARS/\//}"
+# export WORDCHARS="${WORDCHARS/\//}"
+# export OLD_WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
+export WORDCHARS="*?[]~&;!#$%^(){}<>"
 export BC_ENV_ARGS="-l"
 
 . $(brew --prefix)/etc/profile.d/z.sh
@@ -12,8 +14,12 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 export PATH="$HOME/bin:$HOME/go/bin:$HOME/.ghcup/bin:$PATH"
 
 export EDITOR=$HOME/bin/safe_nvim
-export DADE_NEXT=1
-export DISABLE_SPRING=1
+
+export name="--name-only"
+export nonly="--name-only"
+export ns="--name-status"
+export st="--name-status"
+
 bindkey -e # after setting editor, reset terminal to emacs mode
 alias vim="$HOME/bin/safe_nvim"
 
@@ -28,21 +34,23 @@ alias mdb="rake db:migrate; RAILS_ENV=test rake db:migrate"
 
 alias g="git"
 alias gaa="git add --all"
+alias gane="git commit --amend --no-edit"
 alias gb="git branch -i"
 alias gbr="git branch -i --sort=authordate"
 alias gc="git commit"
 alias gane="git commit --amend --no-edit"
 alias gco="git checkout"
 alias gd="git diff"
+alias gdm="git diff --name-only \$(git master)"
+alias gdom="git diff --name-only origin/\$(git master)"
 alias gdc="git diff --cached"
 alias gdd="gddev"
 alias gkl="git clean -fd"
 alias glod="git log --oneline --decorate"
 alias glodd="git log --oneline --decorate -10"
-alias glodm="git log --oneline --decorate HEAD...master~"
-# alias glodr="git log --oneline --decorate HEAD...origin/HEAD~"
-alias glodr="git log --oneline --decorate HEAD...origin/\$(git cb)~"
 alias glodiff="git log --oneline --decorate --left-right HEAD...origin/HEAD"
+alias glodm="git log --oneline --decorate HEAD...master~"
+alias glodr="git log --oneline --decorate HEAD...origin/\$(git cb)~"
 alias gp="git push"
 alias gph="git push origin HEAD"
 alias gpod="git pull origin development"
@@ -152,7 +160,24 @@ export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
 
 [[ -n $SSH_CONNECTION && -z $VIM && -z $TMUX ]] && tmux new -A -s remote
 
-export TERM=screen-256color
+alias -g GG=--graph
+alias -g NS=--name-status
+alias -g NON=--name-only
+alias -g DEC=--decorate
+alias -g 1L=--oneline
+alias -g REL=--relative
+alias -g LR=--left-right
+alias -g SK=" | sk"
+alias -g LL="\$(fc -ln -1)"
+
+alias ls="ls -A1"
+alias ll="ls -Al"
+alias lt="ls -Altr"
+
+# Task Management
+
+alias ht="h task"
+alias hs="h subtask"
 
 source $HOME/.config/broot/launcher/bash/br
 export PATH="$HOME/.local/bin:$PATH"

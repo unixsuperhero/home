@@ -1,63 +1,129 @@
 #!/usr/bin/env ruby
 
 require 'hiiro'
-require 'pry'
-require 'rspec'
 
-# $> h session
-#
-#  Subcommand required!
-#
-#  Possible subcommands:
-#    pin       (subcommand)  /Users/unixsuperhero/.config/hiiro/plugins/pins.rb:12
-#    edit      (subcommand)  /Users/unixsuperhero/.rbenv/versions/3.1.2/lib/ruby/gems/3.1.0/gems/hiiro-0.1.8/lib/hiiro.rb:14
-#    ses       (subcommand)  /Users/unixsuperhero/bin/h-session:99
-#    ls        (subcommand)  /Users/unixsuperhero/bin/h-session:111
-#    new       (subcommand)  /Users/unixsuperhero/bin/h-session:115
-#    kill      (subcommand)  /Users/unixsuperhero/bin/h-session:119
-#    attach    (subcommand)  /Users/unixsuperhero/bin/h-session:123
-#    rename    (subcommand)  /Users/unixsuperhero/bin/h-session:127
-#    switch    (subcommand)  /Users/unixsuperhero/bin/h-session:131
-#    detach    (subcommand)  /Users/unixsuperhero/bin/h-session:135
-#    has       (subcommand)  /Users/unixsuperhero/bin/h-session:139
-#    info      (subcommand)  /Users/unixsuperhero/bin/h-session:143
+Hiiro.run(*ARGV, plugins: [Pins]) do
+  tmux = tmux_client
 
-o = Hiiro.init(*ARGV, plugins: [Pins])
+  add_subcmd(:ls, :list) { |*args|
+    if args.empty?
+      tmux.sessions.each { |s| puts s.to_s }
+    else
+      system('tmux', 'list-sessions', *args)
+    end
+  }
 
-o.add_subcmd(:ls) { |*args|
-  system('tmux', 'list-sessions', *args)
-}
+  add_subcmd(:new) { |name = nil, *args|
+    if name && args.empty?
+      tmux.new_session(name, detached: false)
+    else
+      system('tmux', 'new-session', *[name, *args].compact)
+    end
+  }
 
-o.add_subcmd(:new) { |*args|
-  system('tmux', 'new-session', *args)
-}
+  add_subcmd(:kill) { |name = nil, *args|
+    if name.nil?
+      name = fuzzyfind_from_map(tmux.sessions.name_map)
+    end
 
-o.add_subcmd(:kill) { |*args|
-  system('tmux', 'kill-session', '-t', *args)
-}
+    if name && args.empty?
+      tmux.kill_session(name)
+    elsif name
+      system('tmux', 'kill-session', '-t', name, *args)
+    end
+  }
 
-o.add_subcmd(:attach) { |*args|
-  system('tmux', 'attach-session', '-t', *args)
-}
+  add_subcmd(:attach) { |name = nil, *args|
+    if name.nil?
+      name = fuzzyfind_from_map(tmux.sessions.name_map)
+    end
 
-o.add_subcmd(:rename) { |*args|
-  system('tmux', 'rename-session', *args)
-}
+    if name && args.empty?
+      tmux.attach_session(name)
+    elsif name
+      system('tmux', 'attach-session', '-t', name, *args)
+    end
+  }
 
-o.add_subcmd(:switch) { |*args|
-  system('tmux', 'switch-client', '-t', *args)
-}
+  add_subcmd(:rename) { |old_name = nil, new_name = nil, *args|
+    if old_name.nil?
+      old_name = fuzzyfind_from_map(tmux.sessions.name_map)
+    end
 
-o.add_subcmd(:detach) { |*args|
-  system('tmux', 'detach-client', *args)
-}
+    if old_name && new_name && args.empty?
+      tmux.rename_session(old_name, new_name)
+    elsif old_name
+      system('tmux', 'rename-session', '-t', old_name, *[new_name, *args].compact)
+    end
+  }
 
-o.add_subcmd(:has) { |*args|
-  system('tmux', 'has-session', *args)
-}
+  add_subcmd(:switch) { |name = nil, *args|
+    if name.nil?
+      name = fuzzyfind_from_map(tmux.sessions.name_map)
+    end
 
-o.add_subcmd(:info) { |*args|
-  system('tmux', 'display-message', '-p', '#{session_name}: #{session_windows} windows, #{session_attached} attached', *args)
-}
+    if name
+      tmux.open_session(name)
+    end
+  }
 
-o.run
+  add_subcmd(:detach) { |*args|
+    if args.empty?
+      tmux.detach_client
+    else
+      system('tmux', 'detach-client', *args)
+    end
+  }
+
+  add_subcmd(:has) { |name = nil, *args|
+    if name && args.empty?
+      tmux.session_exists?(name)
+    else
+      system('tmux', 'has-session', *[name, *args].compact)
+    end
+  }
+
+  add_subcmd(:info) { |name = nil, *args|
+    if name.nil? && args.empty?
+      session = tmux.current_session
+      if session
+        puts "#{session.name}: #{session.windows} windows#{session.attached? ? ', attached' : ''}"
+      end
+    else
+      system('tmux', 'display-message', '-p', '#{session_name}: #{session_windows} windows, #{session_attached} attached', *['-t', name, *args].compact)
+    end
+  }
+
+  add_subcmd(:open) { |name = nil|
+    if name.nil?
+      puts "Usage: h session open <name>"
+      next
+    end
+    tmux.open_session(name)
+  }
+
+  add_subcmd(:select) do
+    sessions = tmux.sessions
+    if sessions.empty?
+      STDERR.puts "No sessions found"
+      next
+    end
+
+    selected = fuzzyfind_from_map(sessions.name_map)
+    print selected if selected
+  end
+
+  add_subcmd(:copy) do
+    sessions = tmux.sessions
+    if sessions.empty?
+      STDERR.puts "No sessions found"
+      next
+    end
+
+    selected = fuzzyfind_from_map(sessions.name_map)
+    if selected
+      Hiiro::Shell.pipe(selected, 'pbcopy')
+      puts "Copied session '#{selected}' to clipboard"
+    end
+  end
+end

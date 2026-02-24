@@ -81,6 +81,7 @@ require('lazy').setup({
   'tpope/vim-endwise',
   'tpope/vim-surround',
   'tpope/vim-abolish',
+  'tpope/vim-unimpaired',
   'vim-ruby/vim-ruby',
   'godlygeek/tabular',
   'jremmen/vim-ripgrep',
@@ -113,8 +114,8 @@ require('lazy').setup({
       'saadparwaiz1/cmp_luasnip',
 
       -- Adds LSP completion capabilities
-      'hrsh7th/cmp-nvim-lsp',
-      'hrsh7th/cmp-path',
+      -- 'hrsh7th/cmp-nvim-lsp',
+      -- 'hrsh7th/cmp-path',
 
       -- Adds a number of user-friendly snippets
       'rafamadriz/friendly-snippets',
@@ -365,7 +366,7 @@ function ShowFileStructure()
   vim.api.nvim_command('vnew')
   vim.api.nvim_command('set buftype=nofile')
   vim.api.nvim_command('0r !cat -n ' .. curpath)
-  vim.api.nvim_command('%!rg "^\\s*\\d+\\s*\\b(module|class|def)\\b"')
+  vim.api.nvim_command('%!rg "^\\s*\\d+\\s*\\b(module|class|def)\\b|add_sub(cmd|command)"')
 end
 
 function ShowTestFileStructure()

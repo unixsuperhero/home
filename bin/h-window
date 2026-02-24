@@ -1,59 +1,136 @@
 #!/usr/bin/env ruby
 
-load File.join(Dir.home, 'bin', 'h')
+require 'hiiro'
 
-o = Hiiro.init(*ARGV, plugins: [Pins])
+Hiiro.run(*ARGV, plugins: [Pins]) do
+  tmux = tmux_client
 
-o.add_subcmd(:ls) { |*args|
-  system('tmux', 'list-windows', *args)
-}
+  add_subcmd(:ls) { |*args|
+    if args.empty?
+      tmux.windows.each { |w| puts w.to_s }
+    else
+      system('tmux', 'list-windows', *args)
+    end
+  }
 
-o.add_subcmd(:lsa) { |*args|
-  system('tmux', 'list-windows', '-a', *args)
-}
+  add_subcmd(:lsa) { |*args|
+    if args.empty?
+      tmux.windows(all: true).each { |w| puts w.to_s }
+    else
+      system('tmux', 'list-windows', '-a', *args)
+    end
+  }
 
-o.add_subcmd(:new) { |*args|
-  system('tmux', 'new-window', *args)
-}
+  add_subcmd(:new) { |name = nil, *args|
+    if args.empty?
+      tmux.new_window(name: name)
+    else
+      system('tmux', 'new-window', *[name && "-n", name, *args].compact)
+    end
+  }
 
-o.add_subcmd(:kill) { |*args|
-  system('tmux', 'kill-window', *args)
-}
+  add_subcmd(:kill) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.windows(all: true).name_map)
+    end
 
-o.add_subcmd(:rename) { |*args|
-  system('tmux', 'rename-window', *args)
-}
+    if target && args.empty?
+      tmux.kill_window(target)
+    elsif target
+      system('tmux', 'kill-window', '-t', target, *args)
+    end
+  }
 
-o.add_subcmd(:swap) { |*args|
-  system('tmux', 'swap-window', *args)
-}
+  add_subcmd(:rename) { |*args|
+    system('tmux', 'rename-window', *args)
+  }
 
-o.add_subcmd(:move) { |*args|
-  system('tmux', 'move-window', *args)
-}
+  add_subcmd(:swap) { |*args|
+    system('tmux', 'swap-window', *args)
+  }
 
-o.add_subcmd(:select) { |*args|
-  system('tmux', 'select-window', *args)
-}
+  add_subcmd(:move) { |*args|
+    system('tmux', 'move-window', *args)
+  }
 
-o.add_subcmd(:next) { |*args|
-  system('tmux', 'next-window', *args)
-}
+  add_subcmd(:select) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.windows(all: true).name_map)
+    end
 
-o.add_subcmd(:prev) { |*args|
-  system('tmux', 'previous-window', *args)
-}
+    if target
+      print target
+    end
+  }
 
-o.add_subcmd(:last) { |*args|
-  system('tmux', 'last-window', *args)
-}
+  add_subcmd(:copy) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.windows(all: true).name_map)
+    end
 
-o.add_subcmd(:link) { |*args|
-  system('tmux', 'link-window', *args)
-}
+    if target
+      Hiiro::Shell.pipe(target, 'pbcopy')
+      puts "Copied window '#{target}' to clipboard"
+    end
+  }
 
-o.add_subcmd(:unlink) { |*args|
-  system('tmux', 'unlink-window', *args)
-}
+  add_subcmd(:sw, :switch) { |target = nil, *args|
+    if target.nil?
+      target = fuzzyfind_from_map(tmux.windows(all: true).name_map)
+    end
 
-o.run
+    if target
+      tmux.open_session(target)
+    end
+  }
+
+  add_subcmd(:next) { |*args|
+    if args.empty?
+      tmux.next_window
+    else
+      system('tmux', 'next-window', *args)
+    end
+  }
+
+  add_subcmd(:prev) { |*args|
+    if args.empty?
+      tmux.previous_window
+    else
+      system('tmux', 'previous-window', *args)
+    end
+  }
+
+  add_subcmd(:last) { |*args|
+    if args.empty?
+      tmux.last_window
+    else
+      system('tmux', 'last-window', *args)
+    end
+  }
+
+  add_subcmd(:link) { |*args|
+    system('tmux', 'link-window', *args)
+  }
+
+  add_subcmd(:unlink) { |target = nil, *args|
+    if target && args.empty?
+      tmux.unlink_window(target)
+    else
+      system('tmux', 'unlink-window', *[target && "-t", target, *args].compact)
+    end
+  }
+
+  add_subcmd(:info) { |target = nil|
+    window = if target
+      tmux.windows(all: true).find { |w| w.target == target || w.name == target }
+    else
+      tmux.current_window
+    end
+
+    if window
+      puts window.to_s
+    else
+      puts "Window not found"
+    end
+  }
+end
