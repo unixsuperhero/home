@@ -2,8 +2,9 @@ setopt EXTENDED_GLOB
 setopt PROMPT_VARS
 disable -p '#'
 
-# export WORDCHARS="${WORDCHARS/\//}"
-# export OLD_WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
+export HISTSIZE=99999
+
+export OLD_WORDCHARS="*?_-.[]~=&;!#$%^(){}<>"
 export WORDCHARS="*?[]~&;!#$%^(){}<>"
 export BC_ENV_ARGS="-l"
 
@@ -14,11 +15,6 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 export PATH="$HOME/bin:$HOME/go/bin:$HOME/.ghcup/bin:$PATH"
 
 export EDITOR=$HOME/bin/safe_nvim
-
-export name="--name-only"
-export nonly="--name-only"
-export ns="--name-status"
-export st="--name-status"
 
 bindkey -e # after setting editor, reset terminal to emacs mode
 alias vim="$HOME/bin/safe_nvim"
@@ -35,10 +31,10 @@ alias mdb="rake db:migrate; RAILS_ENV=test rake db:migrate"
 alias g="git"
 alias gaa="git add --all"
 alias gane="git commit --amend --no-edit"
-alias gb="git branch -i"
-alias gbr="git branch -i --sort=authordate"
+alias gb="git branch -i --sort=authordate"
+alias gbr="git branch -i --sort=authordate | tail -15"
+alias gbs="git branch -i --sort=authordate | tac | sed 's/^[^[:alnum:]-]*//' | sk -m"
 alias gc="git commit"
-alias gane="git commit --amend --no-edit"
 alias gco="git checkout"
 alias gd="git diff"
 alias gdm="git diff --name-only \$(git master)"
@@ -56,24 +52,31 @@ alias gph="git push origin HEAD"
 alias gpod="git pull origin development"
 alias gpom="git pull origin master"
 alias gpr="git pull --rebase"
+alias greset="git checkout .; git clean -fd"
 alias gss="git add --all -N; git diff head --name-only --diff-filter=d"
+alias gss="git status -s | sed 's/...//;s/.* -> //'"
 alias gst="git status -s"
 alias spring="bin/spring"
 alias st="git status -s"
-alias greset="git checkout .; git clean -fd"
+alias im=safe_nvim
 alias spring="bin/spring"
 alias webpack="bin/webpack"
 
 # alias skf="sk --cmd 'git ls-files' -f"
 
-alias specs="rg _spec"
-alias rubies="rg '[.]rb$'"
+alias rubies="rg '[.](rb|rake)$'"
+alias bex="bundle exec"
 alias ber="bundle exec rspec"
 alias bers="bundle exec rspec \$(gddev | specs)"
 alias berof="bundle exec rspec --only-failures"
 alias dirty="bundle exec rspec \$(gss | specs)"
+alias specs="rg '\\b(spec/.*_spec.rb|__tests__/.*[.]spec[.][tj]sx?)'"
+alias nospecs="rg -v '\\b(spec/.*_spec.rb|__tests__/.*[.]spec[.][tj]sx?)'"
 
+alias pclaude="\\claude --permission-mode plan"
+alias claude="claude --dangerously-skip-permissions"
 alias gorb="test \$? -eq 0 && say good || say bad"
+alias yorn="test \$? -eq 0 && echo yes || echo no"
 
 function file_exists {
   while read fn
@@ -90,7 +93,25 @@ function gddev {
   fi
 }
 
-alias gbs="gb | sed 's/.*[[:space:]]//' | sk"
+
+autoload -Uz add-zsh-hook
+
+update_git_vars() {
+  if git rev-parse --git-dir > /dev/null 2>&1; then
+    export groot=`git rev-parse --show-toplevel`
+    export cb=$(git cb)
+    export ocb="origin/$cb"
+    export cbo="origin/$cb"
+    export rb="origin/$cb"
+    export m=$(git master)
+    export om="origin/$m"
+    export rom="origin $m"
+  else
+    unset groot cb ocb cbo rb m om rom
+  fi
+}
+
+add-zsh-hook precmd update_git_vars
 
 alias sc="bin/rails c"
 alias ss="bin/rails s -p 3000"
@@ -100,7 +121,7 @@ alias wkr='QUEUE=* bundle exec rake resque:work'
 alias ezs="vim ~/.zshrc"
 alias .zs="source ~/.zshrc"
 
-alias rg="rg -S"
+alias rg="rg -PS"
 alias ls="ls -A1"
 alias ll="ls -Al"
 alias lsr="ls -A1tr"
@@ -138,20 +159,6 @@ export PS1=$'\n'"%~ \$(git_prompt_info)"$'\n'"%#> "
 
 export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
 
-# Set git-related env vars before each prompt
-function _set_git_vars() {
-  if git rev-parse --show-toplevel &>/dev/null; then
-    export b="$(git branch --show-current)"
-    export lb="origin/$cb"
-    export ub="origin $cb"
-    export m="$(git master)"
-    export lm="origin/$m"
-    export um="origin $m"
-  else
-    unset cb cbo ocb m om b lb ub m lm um
-  fi
-}
-precmd_functions+=(_set_git_vars)
 
 source <(starship init zsh --print-full-init)
 
@@ -160,19 +167,23 @@ export PATH="/opt/homebrew/opt/node@14/bin:$PATH"
 
 [[ -n $SSH_CONNECTION && -z $VIM && -z $TMUX ]] && tmux new -A -s remote
 
-alias -g GG=--graph
-alias -g NS=--name-status
-alias -g NON=--name-only
-alias -g DEC=--decorate
-alias -g 1L=--oneline
-alias -g REL=--relative
-alias -g LR=--left-right
-alias -g SK=" | sk"
-alias -g LL="\$(fc -ln -1)"
+export TERM=screen-256color
 
-alias ls="ls -A1"
+alias -g GG="--graph"
+alias -g NS="--name-status"
+alias -g NON="--name-only"
+alias -g REL="--relative"
+alias -g 1L="--oneline"
+alias -g LR="--left-right"
+alias -g DEC="--decorate"
+
+alias gl="git log"
+alias gd="git diff"
+
+alias ls="ls -A"
 alias ll="ls -Al"
 alias lt="ls -Altr"
+alias lltr="ls -Altr"
 
 # Task Management
 
@@ -189,3 +200,16 @@ export PYTHONPATH="$PYTHONPATH:$RESOLVE_SCRIPT_API/Modules/"
 
 export ns="--name-status"
 export nonly="--name-only"
+
+alias ht="h task"
+alias hs="h subtask"
+
+function insert_last_output() {
+  zle -U ' $(!!)'
+}
+
+zle -N insert_last_output
+
+bindkey '^[ ' insert_last_output
+
+source <(fzf --zsh)
