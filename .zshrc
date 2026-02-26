@@ -205,7 +205,17 @@ alias ht="h task"
 alias hs="h subtask"
 
 function insert_last_output() {
-  zle -U ' $(!!)'
+  if [[ "${BUFFER: -6}" == ' $(!!)' ]]; then
+    BUFFER="${BUFFER:0:-6} \$(!-2)"
+  elif [[ "$BUFFER" =~ ' \$\(!-([0-9]+)\)$' ]]; then
+    local num=${match[1]}
+    local suffix_len=$((6 + ${#num}))
+    ((num++))
+    BUFFER="${BUFFER:0:-$suffix_len} \$(!-${num})"
+  else
+    BUFFER+=" \$(!!)"
+  fi
+  CURSOR=${#BUFFER}
 }
 
 zle -N insert_last_output
