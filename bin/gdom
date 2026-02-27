@@ -1,0 +1,15 @@
+#!/bin/bash
+
+main_branch="$(git master)"
+origin_master="origin/$main_branch"
+
+branch=${1:-${origin_master}}
+
+(echo; echo "BRANCH: ${branch}"; echo) 1>&2
+
+if git merge-base --is-ancestor $branch HEAD
+then
+  git diff $branch --name-only --relative --diff-filter=d
+else
+  (echo; echo "$(git cb) is not an ancestor of $branch") 1>&2
+fi

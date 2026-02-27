@@ -2,7 +2,7 @@
 
 if git merge-base --is-ancestor $(git master) HEAD
 then
-  git diff $(git master) --name-only --relative --diff-filter=d
+  git diff $(git master) --name-only --diff-filter=d
 else
   echo "$(git cb) is not an ancestor of $(git master)"
 fi

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if git merge-base --is-ancestor origin/$(git master) HEAD
+then
+  git log --oneline --decorate HEAD...origin/$(git master)~1
+else
+  echo "$(git cb) is not an ancestor of origin/$(git master)"
+fi
+

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if git merge-base --is-ancestor origin/$(git master) HEAD
+then
+  forkpoint="$(git merge-base --fork-point origin/master)"
+  git diff --name-only --relative HEAD...${forkpoint}
+else
+  if git merge-base --is-ancestor $(git master) HEAD
+  then
+    forkpoint="$(git merge-base --fork-point master)"
+    git diff --name-only --relative HEAD...${forkpoint}
+  else
+    echo "$(git cb) is not an ancestor of origin/$(git master) or master"
+  fi
+fi
+
+
