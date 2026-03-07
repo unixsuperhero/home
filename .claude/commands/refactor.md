@@ -228,6 +228,98 @@ Signs you're mixing levels:
 
 ---
 
+## 6. Naming: Nouns Over Verbs
+
+**Methods should be named for what they return, not what they do.**
+
+### Method Naming Rules
+
+In mid/low-level code, avoid verbs in method names unless the method's **only purpose** is to mutate internal state (like `push`/`pop` on an array).
+
+If a method returns a value derived from state (or state + args), name it after **what the return value IS**:
+
+```ruby
+# Bad: verb-based naming
+def strip_frontmatter(text)
+  # ... returns content without frontmatter
+end
+
+def calculate_total(order)
+  # ... returns a number
+end
+
+def resolve_task(name)
+  # ... returns a task object
+end
+
+# Good: noun-based naming (what it returns)
+def prompt  # returns the prompt content
+def total   # returns the total
+def task    # returns the task
+```
+
+### Class Naming Rules
+
+Avoid actor/verb naming conventions. Classes should be nouns representing **things**, not actions:
+
+```ruby
+# Bad: actor names (verbs disguised as nouns)
+class TaskStarter; end
+class TaskSwitcher; end
+class AppResolver; end
+class PriceCalculator; end
+
+# Good: thing names
+class Task; end
+class TaskState; end
+class App; end
+class Pricing; end
+class CartPricing; end
+```
+
+### Extract to Value Objects
+
+When a method doesn't belong in the current class, extract it to a value object that owns that data:
+
+```ruby
+# Bad: Queue class has strip_frontmatter
+class Queue
+  def strip_frontmatter(text)
+    # ... parsing logic
+  end
+end
+
+# Good: Prompt value object owns its own data
+class Prompt
+  def initialize(doc)
+    @doc = doc
+  end
+
+  def frontmatter           # the parsed frontmatter hash
+    @doc.front_matter
+  end
+
+  def frontmatter_value(key) # a specific frontmatter value
+    frontmatter[key]
+  end
+
+  def prompt                 # doc content without frontmatter
+    @doc.content.strip
+  end
+
+  def task_name
+    frontmatter_value('task_name')
+  end
+end
+```
+
+The value object:
+- Owns the data it represents
+- Exposes data through noun-named accessors
+- Keeps related data together
+
+---
+
 ## Refactoring Checklist
 
 When reviewing code, ask:
@@ -242,6 +334,9 @@ When reviewing code, ask:
 8. **Can this be composed?** If not, it might be doing too much
 9. **Is presentation mixed with logic?** Separate formatting from domain rules
 10. **Does this method mix abstraction levels?** Extract details to helpers
+11. **Does this method have a verb name but return data (and doesn't modify internal state)?** Rename to what it returns
+12. **Is this class named like an actor (TaskStarter)?** Rename to a noun (Task, TaskState)
+13. **Does this method belong here?** If not, extract to a value object that owns the data
 
 ---
 
@@ -253,5 +348,6 @@ Look at the code in context and identify refactoring opportunities based on thes
 3. Respect abstraction boundaries
 4. Keep presentation separate from application logic
 5. Maintain consistent abstraction level within each method
+6. Use noun-based naming (methods named for what they return, classes named for things)
 
 Explain your reasoning as you refactor.
