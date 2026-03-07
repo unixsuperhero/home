@@ -10,6 +10,7 @@ Refactor toward **composable, reusable code** by separating concerns across clea
 
 **ALMOST NEVER:** Use inheritance.
 **ALMOST ALWAYS:** Favor composition.
+**ALWAYS:** Check references after renaming classes or changing method signatures (name, args, return value) and update anything that would break.
 
 ---
 
