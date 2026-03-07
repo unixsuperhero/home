@@ -55,6 +55,24 @@ Requirements for composable objects:
 - **No side-effects** in data/computation methods
 - **Single atomic operation** per method (I call these "atomic operations")
 - Methods expose information/possibilities, not workflows
+- **Sane defaults** for convenience - infer context when not provided
+
+```ruby
+# Good: sane defaults make the common case simple
+class Tmux
+  def split_pane(target: current_pane)  # defaults to current pane
+    # ...
+  end
+
+  def send_keys(keys, target: current_pane)
+    # ...
+  end
+end
+
+# Developer can just call:
+tmux.split_pane                    # uses current pane
+tmux.split_pane(target: other_pane) # explicit when needed
+```
 
 ```ruby
 # Good: exposes possibilities via clear interface
