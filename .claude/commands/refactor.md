@@ -8,6 +8,9 @@ Apply these principles when refactoring code. The user may provide additional co
 
 Refactor toward **composable, reusable code** by separating concerns across clear abstraction layers. Think "functional core, imperative shell" (Gary Bernhardt).
 
+**ALMOST NEVER:** Use inheritance.
+**ALMOST ALWAYS:** Favor composition.
+
 ---
 
 ## 1. Data-First
@@ -446,6 +449,7 @@ When reviewing code, ask:
 15. **Are there multiple top-level classes in one file?** Extract each to its own file
 16. **Is this inner class used throughout the codebase?** Promote to an accessible namespace
 17. **Does this class need to be constructed from different sources?** Add `from_*` alternate constructors
+18. **Is this using inheritance?** Refactor to use composition instead
 
 ---
 
