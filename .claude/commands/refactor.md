@@ -260,22 +260,51 @@ def task    # returns the task
 
 ### Class Naming Rules
 
-Avoid actor/verb naming conventions. Classes should be nouns representing **things**, not actions:
+Avoid actor/verb naming conventions. When you see an actor class, don't just rename it - consider where the logic belongs:
 
 ```ruby
 # Bad: actor names (verbs disguised as nouns)
 class TaskStarter; end
 class TaskSwitcher; end
 class AppResolver; end
-class PriceCalculator; end
 
-# Good: thing names
-class Task; end
-class TaskState; end
-class App; end
-class Pricing; end
-class CartPricing; end
+# Also bad: just dropping the suffix
+class TaskStart; end   # Still verb-based, not a thing
+
+# Better: Add a method to the existing object
+class Task
+  def start; end       # Task#start - the task starts itself
+  def switch_to; end   # Task#switch_to
+end
+
+class App
+  def resolved_path; end  # App#resolved_path - returns the resolved path
+end
 ```
+
+**Decision process for actor classes:**
+
+1. **First choice:** Look for an existing object that should own this behavior
+   - `TaskStarter` → Does `Task` exist? Add `Task#start`
+   - `AppResolver` → Does `App` exist? Add `App#resolved_path`
+   - Make sure it's the same kind of object (not a different `Task` from another context)
+
+2. **If logic is complex:** Extract to a helper class named after **what it represents**, not what it does
+   - `TaskStarter` → `Task::Validation` or `Task::Prerequisites` (the things being checked)
+   - `PriceCalculator` → `Pricing` or `CartPricing` (the pricing data)
+   - Then `Task#start` can use these helpers internally
+
+3. **Name extracted classes after data/state, not actions:**
+   ```ruby
+   # Bad
+   class Task::TaskStarter; end
+   class Task::TaskValidator; end
+
+   # Good
+   class Task::StartPrerequisites; end  # The prerequisites for starting
+   class Task::ValidationResult; end    # The result of validation
+   class Task::Status; end              # The current status
+   ```
 
 ### Extract to Value Objects
 
@@ -335,7 +364,7 @@ When reviewing code, ask:
 9. **Is presentation mixed with logic?** Separate formatting from domain rules
 10. **Does this method mix abstraction levels?** Extract details to helpers
 11. **Does this method have a verb name but return data (and doesn't modify internal state)?** Rename to what it returns
-12. **Is this class named like an actor (TaskStarter)?** Rename to a noun (Task, TaskState)
+12. **Is this class named like an actor (TaskStarter)?** Move logic to the object it acts on (Task#start), or extract to a noun class (Task::Status)
 13. **Does this method belong here?** If not, extract to a value object that owns the data
 
 ---
