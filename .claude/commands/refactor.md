@@ -113,6 +113,7 @@ Different rules for different layers:
 - **Orchestrates** mid/low level objects
 - **Side-effects happen here** at the boundary
 - Should NOT do low-level data manipulation directly
+- **NEVER mix levels** - a high-level class should never do low-level work; delegate instead
 
 ```ruby
 # Low: atomic, composable
@@ -145,6 +146,47 @@ class CheckoutService
   end
 end
 ```
+
+### Service Object Pattern
+
+Service objects are **high-level only**. They should not do any heavy lifting themselves - they orchestrate and delegate to mid/low-level abstractions.
+
+```ruby
+# Bad: service does its own heavy lifting
+class OrderService
+  def process(order)
+    # Low-level work mixed in
+    total = order.items.sum { |i| i.price * i.quantity }
+    tax = total * 0.08
+    formatted = sprintf("$%.2f", total + tax)
+
+    # Side effects
+    save_to_db(order, total)
+    send_email(order.customer, formatted)
+  end
+end
+
+# Good: service delegates all work
+class OrderService
+  def process(order)
+    pricing = OrderPricing.new(order)  # Mid-level handles calculation
+    receipt = Receipt.new(pricing)      # Low-level handles formatting
+
+    OrderRepository.save(order, pricing.total)
+    Mailer.send_receipt(order.customer, receipt)
+  end
+end
+```
+
+**Service objects should:**
+- Coordinate workflow between objects
+- Handle side-effects at boundaries
+- Read like a high-level description of what happens
+
+**Service objects should NOT:**
+- Contain loops, regex, or data manipulation
+- Know implementation details of how things work
+- Mix abstraction levels
 
 ---
 
@@ -479,6 +521,7 @@ When reviewing code, ask:
 16. **Is this inner class used throughout the codebase?** Promote to an accessible namespace
 17. **Does this class need to be constructed from different sources?** Add `from_*` alternate constructors
 18. **Is this using inheritance?** Refactor to use composition instead
+19. **Is this service object doing heavy lifting?** Extract to mid/low-level classes and delegate
 
 ---
 
