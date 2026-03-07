@@ -397,6 +397,16 @@ lib/hiiro/task.rb                 # Hiiro::Task (separate file)
 lib/hiiro/tree.rb                 # Hiiro::Tree (separate file)
 ```
 
+**When renaming files, rename the inner class folder too:**
+
+```
+# If you rename the main file:
+lib/hiiro/tasks.rb → lib/hiiro/task_manager.rb
+
+# Also rename the folder for inner classes:
+lib/hiiro/tasks/ → lib/hiiro/task_manager/
+```
+
 ### Inner Classes vs Top-Level Classes
 
 If an "inner" class is used throughout the codebase (not just by its parent), promote it to the appropriate namespace:
