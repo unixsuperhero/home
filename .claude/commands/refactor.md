@@ -19,6 +19,8 @@ Refactor toward **composable, reusable code** by separating concerns across clea
 - Data should flow through the system; behavior operates on data at boundaries
 - When you see a method doing both computation AND side-effects, split it
 
+**Goal:** Lower-level abstractions should be more **declarative** with **referential transparency** - a method name should consistently represent the same value (given the same state/args).
+
 ```ruby
 # Before: mixed concerns
 def process_order(order)
@@ -349,6 +351,80 @@ The value object:
 
 ---
 
+## 7. File Organization
+
+**Name files after the main class/module they define.**
+
+Follow the project's conventions for file locations. Each file should define one primary class, with inner classes in subdirectories.
+
+```
+# Bad: lib/hiiro/tasks.rb defines multiple top-level classes
+class Hiiro
+  class TaskManager; end      # Main class
+  class TaskManager::Config; end  # Inner class
+  class Environment; end      # Separate class, doesn't belong here
+  class Task; end             # Separate class, doesn't belong here
+  class Tree; end             # Separate class, doesn't belong here
+end
+
+# Good: Extract to proper file structure
+lib/hiiro/task_manager.rb         # Hiiro::TaskManager (main class)
+lib/hiiro/task_manager/config.rb  # Hiiro::TaskManager::Config (inner class)
+lib/hiiro/environment.rb          # Hiiro::Environment (separate file)
+lib/hiiro/task.rb                 # Hiiro::Task (separate file)
+lib/hiiro/tree.rb                 # Hiiro::Tree (separate file)
+```
+
+### Inner Classes vs Top-Level Classes
+
+If an "inner" class is used throughout the codebase (not just by its parent), promote it to the appropriate namespace:
+
+```ruby
+# Bad: Queue::Prompt is used everywhere but nested under Queue
+class Queue
+  class Prompt; end  # Used by TaskLauncher, Environment, Commands...
+end
+
+# Good: Promote to accessible namespace if widely used
+class Prompt; end  # Or Hiiro::Prompt if that's the project convention
+```
+
+### Alternate Constructors
+
+Classes that need to be constructed from different sources should provide **alternate constructors** with the `from_` prefix:
+
+```ruby
+class Prompt
+  def initialize(doc)
+    @doc = doc
+  end
+
+  # Alternate constructor - builds from a file path
+  def self.from_file(path)
+    doc = FrontMatterParser::Parser.parse_file(path)
+    new(doc)
+  end
+
+  # Alternate constructor - builds from raw text
+  def self.from_text(text)
+    doc = FrontMatterParser::Parser.new(:md).call(text)
+    new(doc)
+  end
+end
+
+# Usage
+prompt = Prompt.from_file('/path/to/file.md')
+prompt = Prompt.from_text("---\ntitle: Hello\n---\nContent")
+prompt = Prompt.new(already_parsed_doc)
+```
+
+This pattern:
+- Keeps `initialize` simple (takes the canonical form)
+- Makes construction context explicit in the method name
+- Allows the class to be easily used in different contexts
+
+---
+
 ## Refactoring Checklist
 
 When reviewing code, ask:
@@ -366,6 +442,10 @@ When reviewing code, ask:
 11. **Does this method have a verb name but return data (and doesn't modify internal state)?** Rename to what it returns
 12. **Is this class named like an actor (TaskStarter)?** Move logic to the object it acts on (Task#start), or extract to a noun class (Task::Status)
 13. **Does this method belong here?** If not, extract to a value object that owns the data
+14. **Is this file named after its main class?** Rename file to match (e.g., `tasks.rb` → `task_manager.rb`)
+15. **Are there multiple top-level classes in one file?** Extract each to its own file
+16. **Is this inner class used throughout the codebase?** Promote to an accessible namespace
+17. **Does this class need to be constructed from different sources?** Add `from_*` alternate constructors
 
 ---
 
@@ -378,5 +458,6 @@ Look at the code in context and identify refactoring opportunities based on thes
 4. Keep presentation separate from application logic
 5. Maintain consistent abstraction level within each method
 6. Use noun-based naming (methods named for what they return, classes named for things)
+7. Organize files properly (one main class per file, named after that class)
 
 Explain your reasoning as you refactor.
