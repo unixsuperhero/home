@@ -216,10 +216,13 @@ alias -g DEC="--decorate"
 alias gl="git log"
 alias gd="git diff"
 
-# Task Management
+# Hiiro
 
 alias ht="h task"
 alias hs="h subtask"
+alias hq="h queue"
+alias htq="h task queue"
+alias hsq="h subtask queue"
 
 source $HOME/.config/broot/launcher/bash/br
 export PATH="$HOME/.local/bin:$PATH"
@@ -251,3 +254,4 @@ function insert_last_output() {
 
 zle -N insert_last_output
 bindkey '^[ ' insert_last_output
+bindkey "^t" transpose-chars
