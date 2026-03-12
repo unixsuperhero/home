@@ -844,6 +844,74 @@ function Ls_l(opts)
   vim.cmd(cmd)           -- Open a terminal in the current window
 end
 
+local function copy_dirname(opts)
+  local current_buffer_name = vim.api.nvim_buf_get_name(0)
+  local current_buffer_path = vim.fn.expand("%:h")
+
+  args = current_buffer_path
+  vim.print('current_buffer_name: ', current_buffer_name)
+  vim.print('current_buffer_path: ', current_buffer_path)
+
+  local cmd = "!echo -n '" .. args .. "' | pbcopy; pbpaste"
+  vim.print('cmd: ', cmd)
+
+  vim.cmd(cmd) -- copy the github link to the current buffer
+end
+
+local function copy_abspath(opts)
+  local current_buffer_name = vim.api.nvim_buf_get_name(0)
+  local current_buffer_path = vim.fn.expand("%:p")
+
+  args = current_buffer_path
+  vim.print('current_buffer_name: ', current_buffer_name)
+  vim.print('current_buffer_path: ', current_buffer_path)
+
+  local cmd = "!echo -n '" .. args .. "' | pbcopy; pbpaste"
+  vim.print('cmd: ', cmd)
+
+  vim.cmd(cmd) -- copy the github link to the current buffer
+end
+
+local function copy_filename(opts)
+  local current_buffer_name = vim.api.nvim_buf_get_name(0)
+  local current_buffer_path = vim.fn.expand("%:t")
+
+  args = current_buffer_path
+  vim.print('current_buffer_name: ', current_buffer_name)
+  vim.print('current_buffer_path: ', current_buffer_path)
+
+  local cmd = "!echo -n '" .. args .. "' | pbcopy; pbpaste"
+  vim.print('cmd: ', cmd)
+
+  vim.cmd(cmd) -- copy the github link to the current buffer
+end
+
+local function copy_filepath(opts)
+  local current_buffer_name = vim.api.nvim_buf_get_name(0)
+  local current_buffer_path = vim.fn.expand("%")
+
+  args = current_buffer_path
+  vim.print('current_buffer_name: ', current_buffer_name)
+  vim.print('current_buffer_path: ', current_buffer_path)
+
+  local cmd = "!echo -n '" .. args .. "' | pbcopy; pbpaste"
+  vim.print('cmd: ', cmd)
+
+  vim.cmd(cmd) -- copy the github link to the current buffer
+end
+
+local function show_in_finder(opts)
+  local current_buffer_path = vim.fn.expand("%")
+
+  args = current_buffer_path
+  vim.print('current_buffer_path: ', current_buffer_path)
+
+  local cmd = "!open -R '" .. args
+  vim.print('cmd: ', cmd)
+
+  vim.cmd(cmd) -- highlight the file in finder
+end
+
 local function copy_github_link(opts)
   local args = opts.args
 
@@ -873,13 +941,37 @@ local function open_github_link(opts)
 
   local cmd = "!gh browse " .. args
 
-  vim.cmd(cmd) -- copy the github link to the current buffer
+  vim.cmd(cmd)
+end
+
+local function remove_color_codes(opts)
+  local cmd = "%s/\\[\\d\\d*m//"
+  vim.cmd(cmd)
+  vim.opt_local.buftype = "nofile"
+end
+
+vim.api.nvim_create_user_command("RemoveColorCodes", remove_color_codes, { nargs = "*"})
+vim.keymap.set('n', '<leader>rj', ':RemoveColorCodes<cr>', { desc = 'Remove color codes' })
+
+local function run_scratch(opts)
+  vim.cmd('/__END__/+1,$d')
+  vim.cmd('silent $r!ruby -r awesome_print ' .. vim.fn.expand("%"))
 end
 
 vim.api.nvim_create_user_command("T", bottom_split_terminal, {})
 vim.api.nvim_create_user_command("Lsl", Ls_l, { nargs = "*"})
 vim.api.nvim_create_user_command("CopyLink", copy_github_link, { nargs = "*"})
 vim.api.nvim_create_user_command("OpenLink", open_github_link, { nargs = "*"})
+vim.api.nvim_create_user_command("CopyDirname", copy_dirname, { nargs = "*"})
+vim.api.nvim_create_user_command("CopyAbspath", copy_abspath, { nargs = "*"})
+vim.api.nvim_create_user_command("CopyFilename", copy_filename, { nargs = "*"})
+vim.api.nvim_create_user_command("CopyFilepath", copy_filepath, { nargs = "*"})
+vim.api.nvim_create_user_command("CopyPath", copy_filepath, { nargs = "*"})
+vim.api.nvim_create_user_command("Cppath", copy_filepath, { nargs = "*"})
+vim.api.nvim_create_user_command("Finder", show_in_finder, { nargs = "*"})
+vim.api.nvim_create_user_command("RunScratch", run_scratch, { nargs = "*"})
+
+vim.cmd('hi! link Comment MiniDiffOverContext')
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "ruby",
