@@ -104,6 +104,18 @@ require('lazy').setup({
       'folke/neodev.nvim',
     },
   },
+  {
+    "unixsuperhero/h-claude.nvim",
+    config = function()
+      require("h-claude").setup()
+    end,
+  },
+  {
+    "unixsuperhero/demo.nvim",
+    lazy = false,
+    priority = 1000,
+    opts = {},
+  },
 
   {
     -- Autocompletion
@@ -345,15 +357,23 @@ vim.keymap.set('n', '<leader>s', ':sp <c-r>=expand("%:h")<cr>/')
 vim.keymap.set('n', '<leader>v', ':vs <c-r>=expand("%:h")<cr>/')
 vim.keymap.set('n', '<leader>q', ':q<cr>')
 
-local function toggle_buftype()
-  if vim.bo.buftype == 'nofile' then
-    vim.bo.buftype = ''
+-- Toggle buffer option between 2 values
+function toggle_buffer_option(name, val1, val2)
+  local current_val = vim.bo[name]
+  if current_val == val1 then
+    print("changing buftype from '" .. current_val .. "' to '" .. val2 .. "'")
+    vim.bo[name] = val2
   else
-    vim.bo.buftype = 'nofile'
+    print("changing buftype from '" .. current_val .. "' to '" .. val1 .. "'")
+    vim.bo[name] = val1
   end
 end
 
-normal_map('cob', toggle_buftype, 'toggle buftype option between nothing and nofile')
+function toggle_buftype()
+  toggle_buffer_option('buftype', 'nofile', '')
+end
+
+vim.keymap.set('n', 'cob', toggle_buftype) -- , { desc = 'toggle buftype b/t nofile and blank (normal)' })
 vim.keymap.set('n', 'cow', ':set invwrap<cr>')
 vim.keymap.set('n', ',t', ':sp|wincmd J<cr>:let @j="bundle exec rspec " . @%<cr>:term<cr>"jpa<cr>')
 vim.keymap.set('n', ',T', ':sp|wincmd J<cr>:let @j="bundle exec rspec " . @% . ":" . line(".")<cr>:term<cr>"jpa<cr>')
@@ -366,7 +386,7 @@ function ShowFileStructure()
   vim.api.nvim_command('vnew')
   vim.api.nvim_command('set buftype=nofile')
   vim.api.nvim_command('0r !cat -n ' .. curpath)
-  vim.api.nvim_command('%!rg "^\\s*\\d+\\s*\\b(module|class|def)\\b|add_sub(cmd|command)"')
+  vim.api.nvim_command('%!rg "^\\s*\\d+\\s*\\b(module|public|private|protected|class|def)\\b|add_sub(cmd|command)"')
 end
 
 function ShowTestFileStructure()
