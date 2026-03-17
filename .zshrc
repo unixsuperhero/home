@@ -18,6 +18,10 @@ export EDITOR=$HOME/bin/safe_nvim
 
 bindkey -e # after setting editor, reset terminal to emacs mode
 alias vim="$HOME/bin/safe_nvim"
+alias vi="$HOME/bin/safe_nvim"
+alias im="$HOME/bin/safe_nvim"
+alias vimo="$HOME/bin/safe_nvim -O"
+alias vo="$HOME/bin/safe_nvim -O"
 
 zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
 autoload -Uz compinit && compinit
@@ -30,6 +34,7 @@ alias ezs="vim ~/.zshrc"
 alias .zs="source ~/.zshrc"
 alias pclaude="claude --permission-mode plan"
 alias dclaude="claude --dangerously-skip-permissions"
+alias cld="claude"
 alias gorb="test \$? -eq 0 && say good || say bad"
 alias yorn="test \$? -eq 0 && echo yes || echo no"
 
@@ -58,25 +63,34 @@ alias gd="git diff"
 alias gdc="git diff --cached"
 alias gdr="git diff --relative"
 alias gkl="git clean -fd"
+alias gf="git merge-base --fork-point origin/\$(git master)"
 alias glod="git log --oneline --decorate"
+alias gll="git log --oneline --decorate -10"
 alias glodd="git log --oneline --decorate -10"
+alias glf="git log 1L DEC HEAD...\$(git merge-base --fork-point origin/\$(git master))~"
+alias glfp="git log 1L DEC HEAD...\$(git merge-base --fork-point origin/\$(git master))~"
+alias glfps="git log 1L DEC NS HEAD...\$(git merge-base --fork-point origin/\$(git master))~"
 alias glodm="git log --oneline --decorate HEAD...master~"
 alias glodr="git log --oneline --decorate HEAD...origin/\$(git cb)~"
-alias glodiff="git log --oneline --decorate --left-right HEAD...origin/HEAD"
+alias glrodiff="git log --oneline --decorate --left-right HEAD...origin/HEAD"
 alias glrm="git log --oneline --decorate HEAD...master~"
 alias glrom="git log --oneline --decorate HEAD...origin/master~"
 alias gp="git push"
 alias gph="git push origin HEAD"
+alias gphf="git push origin HEAD -f"
 alias gpod="git pull origin development"
 alias gpom="git pull origin master"
 alias gpr="git pull --rebase"
 alias greset="git checkout .; git clean -fd"
-alias gss="git add --all -N; git diff head --name-only --diff-filter=d"
-alias gss="git status -s | sed 's/...//;s/.* -> //'"
+# alias gss="git add --all -N; git diff head --name-only --diff-filter=d"
+# alias gss="git status -s | sed 's/...//;s/.* -> //'"
 alias gst="git status -s"
 alias st="git status -s"
+alias greset="git checkout .; git clean -fd"
+alias gfp="git merge-base --fork-point"
 alias gfpm="git merge-base --fork-point \$(git master)"
 alias gfpom="git merge-base --fork-point origin/\$(git master)"
+alias gdf="git diff NON REL \$(git merge-base --fork-point origin/\$(git master))"
 alias gdfp="git diff NON REL \$(git merge-base --fork-point origin/\$(git master))"
 alias gdfpa="git diff NON \$(git merge-base --fork-point origin/\$(git master))"
 alias gdfpr="git diff NON \$(git merge-base --fork-point origin/\$(git master)) | sed \"s@^@\$(git rev-parse --show-cdup)@\""
@@ -224,6 +238,8 @@ alias hq="h queue"
 alias htq="h task queue"
 alias hsq="h subtask queue"
 
+export TERM=screen-256color
+
 source $HOME/.config/broot/launcher/bash/br
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -239,9 +255,9 @@ alias ht="h task"
 alias hs="h subtask"
 
 function insert_last_output() {
-  if [[ "${BUFFER: -6}" == ' $(!!)' ]]; then
+  if [[ "${BUFFER:-6}" =~ ' [$]\(!!\)' ]]; then
     BUFFER="${BUFFER:0:-6} \$(!-2)"
-  elif [[ "$BUFFER" =~ ' \$\(!-([0-9]+)\)$' ]]; then
+  elif [[ "$BUFFER" =~ ' [$]\(!-([0-9]+)\)$' ]]; then
     local num=${match[1]}
     local suffix_len=$((6 + ${#num}))
     ((num++))
@@ -255,3 +271,5 @@ function insert_last_output() {
 zle -N insert_last_output
 bindkey '^[ ' insert_last_output
 bindkey "^t" transpose-chars
+
+alias lspr="h pr ls -1U"
