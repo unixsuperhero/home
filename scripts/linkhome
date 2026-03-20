@@ -48,12 +48,9 @@ def sync_directory(base_pattern)
   end
 
   # Pass 2: ensure every repo file has a symlink in home
-  if repo_dir.exist?
-    Dir.glob(repo_dir / '**' / '*').each do |file|
-      next if File.directory?(file)
-      relative = Pathname.new(file).relative_path_from(REPO_ROOT).to_s
-      ensure_symlink(relative)
-    end
+  if repo_dir.exist? && !home_dir.symlink?
+    relative = Pathname.new(repo_dir).relative_path_from(REPO_ROOT).to_s
+    ensure_symlink(relative)
   end
 end
 
@@ -120,7 +117,11 @@ def ensure_symlink(relative_path)
   elsif home_file.exist?
     # Real file — repo wins, replace with symlink
     puts "Replacing real file with symlink: ~/#{relative_path}"
-    FileUtils.rm(home_file.to_s)
+    if home_file.directory?
+      FileUtils.mv(home_file, [home_file, 'backup'].join(?.))
+    else
+      FileUtils.rm(home_file.to_s)
+    end
   end
 
   FileUtils.mkdir_p(home_file.dirname)
