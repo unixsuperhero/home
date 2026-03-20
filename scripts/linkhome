@@ -4,21 +4,21 @@ require 'fileutils'
 require 'pathname'
 
 REPO_ROOT = Pathname.new(File.expand_path('..', __dir__))
-CLAUDE_HOME = Pathname.new(File.expand_path('~/.claude'))
+LINK_HOME = Pathname.new(File.expand_path('~/'))
 
 # Files/folders to track (tooling)
 TRACKED_PATTERNS = %w[
-  commands
-  agents
-  skills
-  settings.json
-  settings.local.json
+  .pandoc
+  .config/rectangle
+  .config/starship
+  .zshrc
+  .tmux.conf
 ]
 
 def main
   TRACKED_PATTERNS.each do |pattern|
     repo_path = REPO_ROOT / pattern
-    home_path = CLAUDE_HOME / pattern
+    home_path = LINK_HOME / pattern
 
     is_dir = (repo_path.directory?) ||
              (home_path.exist? && home_path.directory? && !home_path.symlink?)
@@ -36,13 +36,13 @@ end
 # For directory patterns: walk both sides and sync each file
 def sync_directory(base_pattern)
   repo_dir = REPO_ROOT / base_pattern
-  home_dir = CLAUDE_HOME / base_pattern
+  home_dir = LINK_HOME / base_pattern
 
   # Pass 1: move real files from home into repo (repo wins if both exist)
   if home_dir.exist? && !home_dir.symlink?
     Dir.glob(home_dir / '**' / '*').each do |file|
       next if File.directory?(file)
-      relative = Pathname.new(file).relative_path_from(CLAUDE_HOME).to_s
+      relative = Pathname.new(file).relative_path_from(LINK_HOME).to_s
       ensure_in_repo(relative)
     end
   end
@@ -66,7 +66,7 @@ end
 # Move a real file from ~/.claude into the repo.
 # If the repo already has the file, the repo version wins (never overwritten).
 def ensure_in_repo(relative_path)
-  home_file = CLAUDE_HOME / relative_path
+  home_file = LINK_HOME / relative_path
   repo_file = REPO_ROOT / relative_path
 
   # Fix backwards symlink: repo file should never be a symlink
@@ -99,7 +99,7 @@ end
 # Replaces any real file at that location (repo always wins).
 def ensure_symlink(relative_path)
   repo_file = REPO_ROOT / relative_path
-  home_file = CLAUDE_HOME / relative_path
+  home_file = LINK_HOME / relative_path
 
   return unless repo_file.exist?
 

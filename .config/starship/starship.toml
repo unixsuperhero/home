@@ -24,7 +24,7 @@ disabled = true
 disabled = true
 
 [ruby]
-disabled = true
+disabled = false
 
 [git_status]
 stashed = ''
@@ -37,3 +37,19 @@ format = '[$symbol$branch(:$remote_branch)]($style) '
 disabled = false
 time_format = '%Y-%m-%d %H:%M:%S '
 format = "[$time]($style)"
+
+# Show tmux session name when inside a tmux session
+[custom.tmux]
+description = "Current tmux session name"
+command = "tmux display-message -p '#S'"
+when = '[ -n "$TMUX" ]'
+format = "[tmux:$output]($style) "
+style = "bold yellow"
+
+# Show worktree name when inside a linked git worktree (not the main worktree)
+[custom.worktree]
+description = "Git worktree name"
+command = "basename $(git rev-parse --show-toplevel)"
+when = 'git rev-parse --git-dir 2>/dev/null | grep -q "worktrees"'
+format = "[worktree:$output]($style) "
+style = "bold cyan"
