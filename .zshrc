@@ -272,4 +272,4 @@ zle -N insert_last_output
 bindkey '^[ ' insert_last_output
 bindkey "^t" transpose-chars
 
-alias lspr="h pr ls -1U"
+alias lspr="h pr ls -1u"
