@@ -115,16 +115,16 @@ def ensure_symlink(relative_path)
   if home_file.symlink?
     # Already a symlink — check if it points to the right place
     return if home_file.readlink.to_s == repo_file.to_s
-    puts "Updating symlink: ~/.claude/#{relative_path}"
+    puts "Updating symlink: ~/#{relative_path}"
     FileUtils.rm(home_file.to_s)
   elsif home_file.exist?
     # Real file — repo wins, replace with symlink
-    puts "Replacing real file with symlink: ~/.claude/#{relative_path}"
+    puts "Replacing real file with symlink: ~/#{relative_path}"
     FileUtils.rm(home_file.to_s)
   end
 
   FileUtils.mkdir_p(home_file.dirname)
-  puts "Creating symlink: ~/.claude/#{relative_path} -> #{repo_file}"
+  puts "Creating symlink: ~/#{relative_path} -> #{repo_file}"
   FileUtils.ln_s(repo_file.to_s, home_file.to_s)
 end
 
