@@ -1,0 +1,131 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require 'pathname'
+
+REPO_ROOT = Pathname.new(File.expand_path('..', __dir__))
+CLAUDE_HOME = Pathname.new(File.expand_path('~/.claude'))
+
+# Files/folders to track (tooling)
+TRACKED_PATTERNS = %w[
+  commands
+  agents
+  skills
+  settings.json
+  settings.local.json
+]
+
+def main
+  TRACKED_PATTERNS.each do |pattern|
+    repo_path = REPO_ROOT / pattern
+    home_path = CLAUDE_HOME / pattern
+
+    is_dir = (repo_path.directory?) ||
+             (home_path.exist? && home_path.directory? && !home_path.symlink?)
+
+    if is_dir
+      sync_directory(pattern)
+    else
+      sync_file(pattern)
+    end
+  end
+
+  puts "\nSetup complete!"
+end
+
+# For directory patterns: walk both sides and sync each file
+def sync_directory(base_pattern)
+  repo_dir = REPO_ROOT / base_pattern
+  home_dir = CLAUDE_HOME / base_pattern
+
+  # Pass 1: move real files from home into repo (repo wins if both exist)
+  if home_dir.exist? && !home_dir.symlink?
+    Dir.glob(home_dir / '**' / '*').each do |file|
+      next if File.directory?(file)
+      relative = Pathname.new(file).relative_path_from(CLAUDE_HOME).to_s
+      ensure_in_repo(relative)
+    end
+  end
+
+  # Pass 2: ensure every repo file has a symlink in home
+  if repo_dir.exist?
+    Dir.glob(repo_dir / '**' / '*').each do |file|
+      next if File.directory?(file)
+      relative = Pathname.new(file).relative_path_from(REPO_ROOT).to_s
+      ensure_symlink(relative)
+    end
+  end
+end
+
+# For file patterns: sync the single file both ways
+def sync_file(pattern)
+  ensure_in_repo(pattern)
+  ensure_symlink(pattern)
+end
+
+# Move a real file from ~/.claude into the repo.
+# If the repo already has the file, the repo version wins (never overwritten).
+def ensure_in_repo(relative_path)
+  home_file = CLAUDE_HOME / relative_path
+  repo_file = REPO_ROOT / relative_path
+
+  # Fix backwards symlink: repo file should never be a symlink
+  if repo_file.symlink?
+    if home_file.exist? && !home_file.symlink?
+      puts "Fixing backwards repo symlink: #{relative_path}"
+      FileUtils.rm(repo_file.to_s)
+      FileUtils.mkdir_p(repo_file.dirname)
+      FileUtils.cp(home_file.to_s, repo_file.to_s)
+    else
+      puts "Removing broken backwards repo symlink: #{relative_path}"
+      FileUtils.rm(repo_file.to_s)
+    end
+    return
+  end
+
+  # Nothing to do if the home file is already a symlink or doesn't exist
+  return unless home_file.exist? && !home_file.symlink?
+
+  if repo_file.exist?
+    puts "Repo file takes precedence, skipping home copy: #{relative_path}"
+  else
+    FileUtils.mkdir_p(repo_file.dirname)
+    puts "Moving to repo: #{relative_path}"
+    FileUtils.cp(home_file.to_s, repo_file.to_s)
+  end
+end
+
+# Ensure ~/.claude/<relative_path> is a symlink pointing to the repo file.
+# Replaces any real file at that location (repo always wins).
+def ensure_symlink(relative_path)
+  repo_file = REPO_ROOT / relative_path
+  home_file = CLAUDE_HOME / relative_path
+
+  return unless repo_file.exist?
+
+  # Guard: if the home path already resolves to the same real file as the repo
+  # (e.g. a parent directory is a symlink into the repo), there's nothing to do.
+  # Without this check, we'd delete the repo file and create a self-referential symlink.
+  begin
+    return if File.realpath(home_file.to_s) == File.realpath(repo_file.to_s)
+  rescue Errno::ENOENT, Errno::ELOOP
+    # home_file doesn't exist or is a broken symlink — proceed normally
+  end
+
+  if home_file.symlink?
+    # Already a symlink — check if it points to the right place
+    return if home_file.readlink.to_s == repo_file.to_s
+    puts "Updating symlink: ~/.claude/#{relative_path}"
+    FileUtils.rm(home_file.to_s)
+  elsif home_file.exist?
+    # Real file — repo wins, replace with symlink
+    puts "Replacing real file with symlink: ~/.claude/#{relative_path}"
+    FileUtils.rm(home_file.to_s)
+  end
+
+  FileUtils.mkdir_p(home_file.dirname)
+  puts "Creating symlink: ~/.claude/#{relative_path} -> #{repo_file}"
+  FileUtils.ln_s(repo_file.to_s, home_file.to_s)
+end
+
+main

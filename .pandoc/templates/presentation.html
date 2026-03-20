@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="$if(lang)$$lang$$else$en$endif$">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="pandoc + mdoc">
+  $if(title)$<title>$title$</title>$else$<title>Document</title>$endif$
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Tokens ─────────────────────────────── */
+    :root {
+      --bg:        #0c0a08;
+      --surface:   #141210;
+      --surface2:  #1c1916;
+      --border:    #2d2820;
+      --border2:   #3d3630;
+      --text:      #e6ddd0;
+      --text2:     #a09080;
+      --text3:     #6b5f52;
+      --accent:    #c9832a;
+      --accent2:   #e8a03e;
+      --link:      #d4963c;
+      --code-bg:   #181410;
+      --code-text: #ddd0bc;
+      --mark-bg:   rgba(201,131,42,0.18);
+      --radius:    4px;
+      --font-body: 'Lora', Georgia, 'Times New Roman', serif;
+      --font-head: 'Fraunces', 'Palatino Linotype', serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      --max-w:     1200px;
+      --sidebar-w: 240px;
+    }
+
+    /* ── Reset ───────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 18pt; -webkit-font-smoothing: antialiased; }
+
+    /* ── Page chrome ─────────────────────────── */
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 18pt;
+      line-height: 1.75;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ──────────────────────────────── */
+    .page-wrap {
+      display: flex;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* ── Sidebar / TOC ───────────────────────── */
+    #toc-sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 2.5rem 1.25rem 2rem 1.5rem;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border2) transparent;
+    }
+    #toc-sidebar:empty { display: none; }
+
+    .toc-index-link {
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .toc-index-link a {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text3);
+      text-decoration: none;
+      display: block;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius);
+      transition: color 0.15s, background 0.15s;
+    }
+    .toc-index-link a:hover {
+      color: var(--accent2);
+      background: var(--surface2);
+    }
+
+    .toc-label {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text3);
+      margin-bottom: 1rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #toc-sidebar nav ul {
+      list-style: none;
+      padding: 0;
+    }
+    #toc-sidebar nav li { margin: 0; }
+    #toc-sidebar nav a {
+      display: block;
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      line-height: 1.4;
+      color: var(--text2);
+      text-decoration: none;
+      padding: 0.3rem 0.5rem;
+      border-radius: var(--radius);
+      border-left: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    #toc-sidebar nav a:hover {
+      color: var(--text);
+      background: var(--surface2);
+      border-left-color: var(--accent);
+    }
+    #toc-sidebar nav a.active {
+      color: var(--accent2);
+      border-left-color: var(--accent);
+      background: var(--mark-bg);
+    }
+    /* Indent nested TOC */
+    #toc-sidebar nav ul ul { padding-left: 0.75rem; }
+    #toc-sidebar nav ul ul a { font-size: 0.75rem; }
+
+    /* ── Main content ────────────────────────── */
+    .content-wrap {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 2rem 6rem;
+    }
+
+    /* ── Doc header ──────────────────────────── */
+    .doc-header {
+      width: 100%;
+      max-width: var(--max-w);
+      margin-bottom: 3rem;
+      padding-bottom: 1.75rem;
+      border-bottom: 1px solid var(--border);
+      animation: fadeUp 0.45s ease both;
+    }
+
+    .doc-header h1 {
+      font-family: var(--font-head);
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      font-optical-sizing: auto;
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.01em;
+    }
+
+    .doc-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text3);
+      letter-spacing: 0.04em;
+    }
+    .doc-meta span { display: flex; align-items: center; gap: 0.35rem; }
+    .doc-meta .sep { color: var(--border2); }
+
+    /* ── Article body ────────────────────────── */
+    article {
+      width: 100%;
+      max-width: var(--max-w);
+      animation: fadeUp 0.55s 0.08s ease both;
+    }
+
+    /* Headings */
+    article h1, article h2, article h3, article h4, article h5, article h6 {
+      font-family: var(--font-head);
+      font-optical-sizing: auto;
+      line-height: 1.25;
+      color: var(--text);
+      margin-top: 2.5rem;
+      margin-bottom: 0.75rem;
+    }
+    article h1 { font-size: 2rem; font-weight: 700; }
+    article h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    article h3 { font-size: 1.2rem; font-weight: 600; }
+    article h4 { font-size: 1rem; font-weight: 600; color: var(--text2); }
+    article h5, article h6 { font-size: 0.9rem; font-weight: 500; color: var(--text2); }
+
+    /* Anchor links on headings */
+    article h1 a, article h2 a, article h3 a,
+    article h4 a, article h5 a, article h6 a {
+      color: inherit; text-decoration: none;
+    }
+    article h2:hover::after, article h3:hover::after {
+      content: ' #';
+      color: var(--text3);
+      font-family: var(--font-mono);
+      font-size: 0.75em;
+      font-weight: 400;
+    }
+
+    /* Paragraphs */
+    article p { margin-bottom: 1.2rem; }
+
+    /* Links */
+    article a {
+      color: var(--link);
+      text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+      text-underline-offset: 3px;
+      transition: color 0.15s, text-decoration-color 0.15s;
+    }
+    article a:hover {
+      color: var(--accent2);
+      text-decoration-color: var(--accent2);
+    }
+
+    /* Lists */
+    article ul, article ol {
+      padding-left: 1.5rem;
+      margin-bottom: 1.2rem;
+    }
+    article li { margin-bottom: 0.35rem; }
+    article li > ul, article li > ol { margin-top: 0.35rem; margin-bottom: 0; }
+
+    /* Blockquote */
+    article blockquote {
+      margin: 1.5rem 0;
+      padding: 0.75rem 1.25rem;
+      border-left: 3px solid var(--accent);
+      background: var(--surface2);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text2);
+      font-style: italic;
+    }
+    article blockquote p { margin-bottom: 0; }
+
+    /* Horizontal rule */
+    article hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2.5rem 0;
+    }
+
+    /* Tables */
+    article table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+    article thead tr { border-bottom: 2px solid var(--accent); }
+    article th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 18pt;
+      letter-spacing: 0.06em;
+      color: var(--text3);
+    }
+    article td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    article tbody tr:hover td { background: var(--surface2); }
+
+    /* Inline code */
+    article code {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+      background: var(--code-bg);
+      color: var(--accent2);
+      padding: 0.15em 0.45em;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    /* Code blocks */
+    article pre {
+      margin: 1.5rem 0;
+      background: var(--code-bg) !important;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow-x: auto;
+      position: relative;
+    }
+    article pre code {
+      display: block;
+      padding: 1.1rem 1.25rem;
+      font-size: 0.8rem;
+      line-height: 1.65;
+      background: transparent !important;
+      color: var(--code-text);
+      border: none;
+    }
+    /* Language badge */
+    article div.sourceCode { position: relative; }
+    article div.sourceCode::before {
+      content: attr(data-lang);
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text3);
+      pointer-events: none;
+    }
+
+    /* Images */
+    article img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      display: block;
+      margin: 1.5rem auto;
+    }
+    article figure { margin: 1.5rem 0; }
+    article figcaption {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text3);
+      margin-top: 0.5rem;
+      font-style: italic;
+    }
+
+    /* Definition lists */
+    article dt {
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 0.75rem;
+    }
+    article dd {
+      padding-left: 1.25rem;
+      color: var(--text2);
+    }
+
+    /* Mark / highlight */
+    article mark {
+      background: var(--mark-bg);
+      color: var(--accent2);
+      padding: 0.1em 0.3em;
+      border-radius: 2px;
+    }
+
+    /* ── Syntax highlighting overrides ────────── */
+    /* Override pandoc breezedark to match warm palette */
+    $if(highlighting-css)$
+    $highlighting-css$
+    /* Warm overrides */
+    pre.sourceCode, div.sourceCode pre { background: var(--code-bg) !important; }
+    code span.kw { color: #c792ea; font-weight: 500; }  /* keyword */
+    code span.cf { color: #c792ea; }                     /* control flow */
+    code span.dt { color: #ffcb6b; }                     /* data type */
+    code span.dv { color: #f78c6c; }                     /* decimal val */
+    code span.fl { color: #f78c6c; }                     /* float */
+    code span.co { color: #6b7c93; font-style: italic; } /* comment */
+    code span.st { color: #c3e88d; }                     /* string */
+    code span.op { color: #89ddff; }                     /* operator */
+    code span.fu { color: #82aaff; }                     /* function */
+    code span.va { color: var(--code-text); }            /* variable */
+    code span.at { color: #ffcb6b; }                     /* attribute */
+    code span.an { color: #e8a03e; }                     /* annotation */
+    code span.do { color: #6b7c93; font-style: italic; } /* doc comment */
+    code span.er { color: #f07178; font-weight: 500; }   /* error */
+    code span.wa { color: #f07178; }                     /* warning */
+    $endif$
+
+    /* ── Light mode toggle ───────────────────── */
+    #theme-toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 100;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+    #theme-toggle:hover { background: var(--surface); color: var(--text); }
+
+    /* Light mode */
+    body.light {
+      --bg:        #faf8f5;
+      --surface:   #f3f0eb;
+      --surface2:  #ebe7e0;
+      --border:    #ddd8d0;
+      --border2:   #ccc8c0;
+      --text:      #1a1510;
+      --text2:     #5a5248;
+      --text3:     #9a9088;
+      --accent:    #b06e1a;
+      --accent2:   #c8821e;
+      --link:      #9e6318;
+      --code-bg:   #ede9e2;
+      --code-text: #2a2018;
+      --mark-bg:   rgba(176,110,26,0.12);
+    }
+
+    /* ── Footer ──────────────────────────────── */
+    .doc-footer {
+      width: 100%;
+      max-width: var(--max-w);
+      margin-top: 4rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text3);
+      letter-spacing: 0.04em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .doc-footer a {
+      color: var(--text3);
+      text-decoration: none;
+    }
+    .doc-footer a:hover { color: var(--accent2); }
+
+    /* ── Animation ───────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Scrollbar ───────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ── Print ───────────────────────────────── */
+    @media print {
+      #toc-sidebar, #theme-toggle { display: none; }
+      body { background: white; color: black; }
+      .content-wrap { padding: 0; }
+      article a { color: inherit; }
+    }
+
+    /* ── Responsive ──────────────────────────── */
+    @media (max-width: 900px) {
+      #toc-sidebar { display: none; }
+      .content-wrap { padding: 1.5rem 1.25rem 4rem; }
+    }
+    @media (max-width: 600px) {
+      :root { --max-w: 100%; }
+      .doc-header h1 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<button id="theme-toggle" title="Toggle light/dark" aria-label="Toggle theme">◑</button>
+
+<div class="page-wrap">
+  $if(toc)$
+  <aside id="toc-sidebar">
+    <div class="toc-index-link"><a href="../index.html">← All docs</a></div>
+    <div class="toc-label">Contents</div>
+    <nav>$toc$</nav>
+  </aside>
+  $endif$
+
+  <div class="content-wrap">
+    $if(title)$
+    <header class="doc-header">
+      <h1>$title$</h1>
+      <div class="doc-meta">
+        $if(date)$<span>$date$</span><span class="sep">·</span>$endif$
+        $if(author)$<span>$for(author)$$author$$sep$, $endfor$</span><span class="sep">·</span>$endif$
+        <span>Claude</span>
+      </div>
+    </header>
+    $endif$
+
+    <article>
+      $body$
+    </article>
+
+    <footer class="doc-footer">
+      <span>Generated by <code>mdoc</code></span>
+      <a href="../index.html">← All docs</a>
+    </footer>
+  </div>
+</div>
+
+<script>
+  // ── Theme toggle ─────────────────────────────
+  const btn = document.getElementById('theme-toggle');
+  const stored = localStorage.getItem('mdoc-theme');
+  if (stored === 'light') document.body.classList.add('light');
+  btn.addEventListener('click', () => {
+    const isLight = document.body.classList.toggle('light');
+    localStorage.setItem('mdoc-theme', isLight ? 'light' : 'dark');
+  });
+
+  // ── Active TOC tracking ───────────────────────
+  const headings = Array.from(document.querySelectorAll('article h1, article h2, article h3'));
+  const tocLinks = Array.from(document.querySelectorAll('#toc-sidebar nav a'));
+
+  if (headings.length && tocLinks.length) {
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          tocLinks.forEach(a => a.classList.remove('active'));
+          const active = tocLinks.find(a => a.getAttribute('href') === '#' + e.target.id);
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    headings.forEach(h => io.observe(h));
+  }
+
+  // ── Annotate source blocks with language ─────
+  document.querySelectorAll('div.sourceCode').forEach(div => {
+    const cls = Array.from(div.querySelector('pre code')?.classList || []);
+    const lang = cls.find(c => c.startsWith('language-'))?.replace('language-', '');
+    if (lang) div.setAttribute('data-lang', lang);
+  });
+</script>
+</body>
+</html>
