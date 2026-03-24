@@ -351,7 +351,7 @@ vim.keymap.set('t', '<esc>', '<c-\\><c-n>')
 vim.keymap.set('t', '<c-[>', '<c-\\><c-n>')
 
 -- my keymaps
-vim.keymap.set('n', '<leader>w', ':w<cr>')
+vim.keymap.set('n', '<leader>w', '<cmd>w<cr>')
 vim.keymap.set('n', '<leader>e', ':e <c-r>=expand("%:h")<cr>/')
 vim.keymap.set('n', '<leader>s', ':sp <c-r>=expand("%:h")<cr>/')
 vim.keymap.set('n', '<leader>v', ':vs <c-r>=expand("%:h")<cr>/')
@@ -776,6 +776,7 @@ vim.keymap.set("n", "<C-h><C-n>", function() harpoon:list():prev() end)
 vim.keymap.set("n", "<C-h><C-p>", function() harpoon:list():next() end)
 
 vim.keymap.set('n', '<C-w>f', ':vert wincmd f<cr>')
+vim.keymap.set('n', '<C-w><s-f>', ':vert wincmd F<cr>')
 
 -- [[ Configure nvim-cmp ]]
 -- See `:help cmp`
@@ -996,7 +997,51 @@ vim.cmd('hi! link Comment MiniDiffOverContext')
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "ruby",
   callback = function()
-    vim.bo.makeprg = "ruby -c %"
+    vim.opt_local.makeprg = "ruby -c %"
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "markdown",
+  callback = function()
+    vim.opt_local.makeprg = "pandoc % -o %.html -s --metadata title=%:t"
+  end,
+})
+
+
+vim.api.nvim_create_user_command('Vsruby', function()
+  vim.cmd('vs `rubify %`')
+end, {})
+
+vim.api.nvim_create_user_command('Vsspec', function()
+  vim.cmd('vs `specify %`')
+end, {})
+
+vim.api.nvim_create_user_command('BkupFile', function()
+  local stamp = os.date('%Y%m%d%H%M%S')
+  vim.cmd('!cp -v % %.' .. stamp)
+end, {})
+
+function presentation_pandoc()
+  vim.cmd('!pandoc % --template=presentation -o %.html')
+end
+
+vim.keymap.set("n", ",g", presentation_pandoc, { desc = "Demo: start + goto method" })
+vim.keymap.set("n", ",,", ':', {})
+
+local highlight_group = vim.api.nvim_create_augroup('pandoc_render', { clear = true })
+vim.api.nvim_create_autocmd("BufWritePost", {
+  group = "pandoc_render",
+  pattern = "*.md",
+  callback = function()
+    local curfile = vim.fn.expand('%')
+    skip = curfile:find('claude-prompt', 1, true)
+    skip = skip or curfile:find('var/folders', 1, true)
+    if skip == nil then
+      print(skip)
+      vim.cmd('!pandoc % --template=presentation -o %.html')
+      print(skip)
+    end
   end,
 })
 
