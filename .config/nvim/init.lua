@@ -1017,10 +1017,78 @@ vim.api.nvim_create_user_command('Vsspec', function()
   vim.cmd('vs `specify %`')
 end, {})
 
-vim.api.nvim_create_user_command('BkupFile', function()
-  local stamp = os.date('%Y%m%d%H%M%S')
-  vim.cmd('!cp -v % %.' .. stamp)
+-- Backup buffer list stored as a session variable
+vim.g.bkup_buffers = vim.g.bkup_buffers or {}
+
+vim.api.nvim_create_user_command('BkupAdd', function(opts)
+  local bufs = vim.g.bkup_buffers or {}
+  for _, arg in ipairs(vim.split(opts.args, '%s+')) do
+    local n = tonumber(arg)
+    if n then
+      local found = false
+      for _, b in ipairs(bufs) do
+        if b == n then found = true; break end
+      end
+      if not found then table.insert(bufs, n) end
+    end
+  end
+  vim.g.bkup_buffers = bufs
+  print('BkupAdd: buffers = ' .. vim.inspect(bufs))
+end, { nargs = '+' })
+
+vim.api.nvim_create_user_command('BkupRemove', function(opts)
+  local bufs = vim.g.bkup_buffers or {}
+  local remove = {}
+  for _, arg in ipairs(vim.split(opts.args, '%s+')) do
+    local n = tonumber(arg)
+    if n then remove[n] = true end
+  end
+  local filtered = {}
+  for _, b in ipairs(bufs) do
+    if not remove[b] then table.insert(filtered, b) end
+  end
+  vim.g.bkup_buffers = filtered
+  print('BkupRemove: buffers = ' .. vim.inspect(filtered))
+end, { nargs = '+' })
+
+vim.api.nvim_create_user_command('BkupSet', function(opts)
+  local bufs = {}
+  for _, arg in ipairs(vim.split(opts.args, '%s+')) do
+    local n = tonumber(arg)
+    if n then table.insert(bufs, n) end
+  end
+  vim.g.bkup_buffers = bufs
+  print('BkupSet: buffers = ' .. vim.inspect(bufs))
+end, { nargs = '+' })
+
+vim.api.nvim_create_user_command('BkupReset', function()
+  vim.g.bkup_buffers = {}
+  print('BkupReset: cleared')
 end, {})
+
+vim.api.nvim_create_user_command('BkupFile', function()
+  local bufs = vim.g.bkup_buffers or {}
+  if #bufs == 0 then
+    -- fall back to current buffer if list is empty
+    bufs = { vim.api.nvim_get_current_buf() }
+  end
+  local stamp = os.date('%Y%m%d%H%M%S')
+  for _, bufnr in ipairs(bufs) do
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      local path = vim.api.nvim_buf_get_name(bufnr)
+      if path ~= '' then
+        vim.fn.system('cp -v ' .. vim.fn.shellescape(path) .. ' ' .. vim.fn.shellescape(path .. '.' .. stamp))
+        print('Backed up: ' .. path .. '.' .. stamp)
+      else
+        print('Buffer ' .. bufnr .. ' has no file name, skipping')
+      end
+    else
+      print('Buffer ' .. bufnr .. ' is invalid, skipping')
+    end
+  end
+end, {})
+
+vim.keymap.set('n', ',b', ':BkupFile<CR>', { desc = 'Backup tracked buffers' })
 
 function presentation_pandoc()
   vim.cmd('!pandoc % --template=presentation -o %.html')
