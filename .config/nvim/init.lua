@@ -1066,7 +1066,7 @@ vim.api.nvim_create_user_command('BkupReset', function()
   print('BkupReset: cleared')
 end, {})
 
-vim.api.nvim_create_user_command('BkupFile', function()
+vim.api.nvim_create_user_command('Obkupfile', function()
   local bufs = vim.g.bkup_buffers or {}
   if #bufs == 0 then
     -- fall back to current buffer if list is empty
@@ -1088,14 +1088,47 @@ vim.api.nvim_create_user_command('BkupFile', function()
   end
 end, {})
 
+vim.api.nvim_create_user_command('BkupFile', function()
+  local bufs = vim.g.bkup_buffers or {}
+  if #bufs == 0 then
+    -- fall back to current buffer if list is empty
+    bufs = { vim.api.nvim_get_current_buf() }
+  end
+  local stamp = os.date('%Y%m%d%H%M%S')
+  for _, bufnr in ipairs(bufs) do
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      local path = vim.api.nvim_buf_get_name(bufnr)
+      local bufdir = vim.fn.expand('#' .. bufnr .. ':p:h')
+      local bufname = vim.fn.expand('#' .. bufnr .. ':t')
+      local bkup_dir = bufdir .. '/backups/'
+      local outfile = vim.fn.shellescape(bkup_dir .. bufname .. '.' .. stamp)
+      if path ~= '' then
+        vim.fn.system('mkdir -pv ' .. vim.fn.shellescape(bkup_dir))
+        vim.fn.system('cp -v ' .. vim.fn.shellescape(path) .. ' ' .. outfile)
+        print('Backed up: ' .. path .. '.' .. stamp)
+      else
+        print('Buffer ' .. bufnr .. ' has no file name, skipping')
+      end
+    else
+      print('Buffer ' .. bufnr .. ' is invalid, skipping')
+    end
+  end
+end, {})
+
 vim.keymap.set('n', ',b', ':BkupFile<CR>', { desc = 'Backup tracked buffers' })
 
 function presentation_pandoc()
-  vim.cmd('!pandoc % --template=presentation -o %.html')
+  vim.cmd('!pandoc % --template=presentation --syntax-highlighting breezedark --toc --toc-depth=3 -o %.html')
 end
 
 vim.keymap.set("n", ",g", presentation_pandoc, { desc = "Demo: start + goto method" })
 vim.keymap.set("n", ",,", ':', {})
+
+vim.g.autorender = vim.g.autorender or false
+
+vim.api.nvim_create_user_command('Autorender', function()
+  vim.g.autorender = not vim.g.autorender
+end, {})
 
 local highlight_group = vim.api.nvim_create_augroup('pandoc_render', { clear = true })
 vim.api.nvim_create_autocmd("BufWritePost", {
@@ -1103,8 +1136,10 @@ vim.api.nvim_create_autocmd("BufWritePost", {
   pattern = "*.md",
   callback = function()
     local curfile = vim.fn.expand('%')
-    skip = curfile:find('claude-prompt', 1, true)
+    skip = not vim.g.autorender
+    skip = skip or curfile:find('claude-prompt', 1, true)
     skip = skip or curfile:find('var/folders', 1, true)
+    skip = skip or curfile:find('.config/hiiro', 1, true)
     if skip == nil then
       print(skip)
       vim.cmd('!pandoc % --template=presentation -o %.html')
