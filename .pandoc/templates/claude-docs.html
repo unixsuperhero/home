@@ -254,6 +254,99 @@
     }
     article blockquote p { margin-bottom: 0; }
 
+    /* ── Callout / Admonition blocks ──────────── */
+    /* pandoc fenced divs:  ::: info\n...\n:::     */
+    /* or raw:  <blockquote class="warning">…      */
+    article .note, article .info, article .tip,
+    article .warning, article .caution, article .danger,
+    article .error, article .success, article .important,
+    article .abstract, article .question, article .bug,
+    article blockquote.note, article blockquote.info, article blockquote.tip,
+    article blockquote.warning, article blockquote.caution, article blockquote.danger,
+    article blockquote.error, article blockquote.success, article blockquote.important,
+    article blockquote.abstract, article blockquote.question, article blockquote.bug {
+      position: relative;
+      margin: 1.5rem 0;
+      padding: 0.85rem 1.25rem 0.85rem 1.25rem;
+      padding-top: 2.75rem; /* header row height */
+      border-left: 3px solid var(--callout-color, var(--accent));
+      /* tinted header strip via gradient */
+      background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--callout-color, var(--accent)) 12%, transparent) 0,
+        color-mix(in srgb, var(--callout-color, var(--accent)) 12%, transparent) 2.5rem,
+        color-mix(in srgb, var(--callout-color, var(--accent))  5%, transparent) 2.5rem
+      );
+      border-radius: 0 6px 6px 0;
+      font-style: normal;
+      color: var(--text);
+    }
+
+    /* Emoji icon — large, absolutely anchored top-left */
+    article .note::before, article .info::before, article .tip::before,
+    article .warning::before, article .caution::before, article .danger::before,
+    article .error::before, article .success::before, article .important::before,
+    article .abstract::before, article .question::before, article .bug::before,
+    article blockquote.note::before, article blockquote.info::before,
+    article blockquote.tip::before, article blockquote.warning::before,
+    article blockquote.caution::before, article blockquote.danger::before,
+    article blockquote.error::before, article blockquote.success::before,
+    article blockquote.important::before, article blockquote.abstract::before,
+    article blockquote.question::before, article blockquote.bug::before {
+      content: var(--callout-icon, 'ℹ');
+      position: absolute;
+      top: 0.55rem;
+      left: 1.25rem;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    /* Label text — small mono caps, same header row */
+    article .note::after, article .info::after, article .tip::after,
+    article .warning::after, article .caution::after, article .danger::after,
+    article .error::after, article .success::after, article .important::after,
+    article .abstract::after, article .question::after, article .bug::after,
+    article blockquote.note::after, article blockquote.info::after,
+    article blockquote.tip::after, article blockquote.warning::after,
+    article blockquote.caution::after, article blockquote.danger::after,
+    article blockquote.error::after, article blockquote.success::after,
+    article blockquote.important::after, article blockquote.abstract::after,
+    article blockquote.question::after, article blockquote.bug::after {
+      content: var(--callout-name, 'note');
+      position: absolute;
+      top: 0.8rem;
+      left: 2.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--callout-color);
+      line-height: 1;
+    }
+
+    /* Last-paragraph spacing */
+    article .note p:last-child, article .info p:last-child,
+    article .tip p:last-child, article .warning p:last-child,
+    article .caution p:last-child, article .danger p:last-child,
+    article .error p:last-child, article .success p:last-child,
+    article .important p:last-child, article .abstract p:last-child,
+    article .question p:last-child, article .bug p:last-child { margin-bottom: 0; }
+
+    /* Per-type tokens */
+    article .note,      article blockquote.note      { --callout-color: #90a4ae; --callout-icon: '📝'; --callout-name: 'note'; }
+    article .info,      article blockquote.info      { --callout-color: #4fc3f7; --callout-icon: 'ℹ';  --callout-name: 'info'; }
+    article .tip,       article blockquote.tip       { --callout-color: #81c784; --callout-icon: '💡'; --callout-name: 'tip'; }
+    article .warning,   article blockquote.warning   { --callout-color: #ffb74d; --callout-icon: '⚠';  --callout-name: 'warning'; }
+    article .caution,   article blockquote.caution   { --callout-color: #ff8a65; --callout-icon: '🔥'; --callout-name: 'caution'; }
+    article .danger,    article blockquote.danger    { --callout-color: #ef5350; --callout-icon: '✕';  --callout-name: 'danger'; }
+    article .error,     article blockquote.error     { --callout-color: #ef5350; --callout-icon: '✕';  --callout-name: 'error'; }
+    article .success,   article blockquote.success   { --callout-color: #66bb6a; --callout-icon: '✓';  --callout-name: 'success'; }
+    article .important, article blockquote.important { --callout-color: #ce93d8; --callout-icon: '★';  --callout-name: 'important'; }
+    article .abstract,  article blockquote.abstract  { --callout-color: #80cbc4; --callout-icon: '◈';  --callout-name: 'abstract'; }
+    article .question,  article blockquote.question  { --callout-color: #ffcc80; --callout-icon: '?';  --callout-name: 'question'; }
+    article .bug,       article blockquote.bug       { --callout-color: #f48fb1; --callout-icon: '🐛'; --callout-name: 'bug'; }
+
     /* Horizontal rule */
     article hr {
       border: none;
