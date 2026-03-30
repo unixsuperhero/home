@@ -1130,6 +1130,14 @@ vim.api.nvim_create_user_command('Autorender', function()
   vim.g.autorender = not vim.g.autorender
 end, {})
 
+vim.api.nvim_create_user_command('Evim', function()
+  vim.cmd('vs ~/.config/nvim/init.lua')
+end, {})
+
+vim.api.nvim_create_user_command('Svim', function()
+  vim.cmd('source ~/.config/nvim/init.lua')
+end, {})
+
 local highlight_group = vim.api.nvim_create_augroup('pandoc_render', { clear = true })
 vim.api.nvim_create_autocmd("BufWritePost", {
   group = "pandoc_render",
