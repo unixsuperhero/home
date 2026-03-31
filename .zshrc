@@ -13,6 +13,7 @@ export BC_ENV_ARGS="-l"
 
 export HOMEBREW_NO_ENV_HINTS=1
 export HOMEBREW_NO_AUTO_UPDATE=1
+
 export PATH="$HOME/bin:$HOME/go/bin:$HOME/.ghcup/bin:$PATH:/Applications/Ghostty.app/Contents/MacOS"
 export EDITOR=$HOME/bin/safe_nvim
 
@@ -37,6 +38,17 @@ alias dclaude="claude --dangerously-skip-permissions"
 alias cld="claude"
 alias gorb="test \$? -eq 0 && say good || say bad"
 alias yorn="test \$? -eq 0 && echo yes || echo no"
+alias gorb &>/dev/null && unalias gorb
+
+function gorb() {
+  goodorbad=$(test $? -eq 0 && echo "good" || echo "bad")
+
+  if test $# -eq 0; then
+    say $goodorbad
+  else
+    say "$@" $goodorbad
+  fi
+}
 
 alias gane="git commit --amend --no-edit"
 alias gb="git branch -i --sort=authordate"
@@ -149,7 +161,8 @@ autoload -Uz add-zsh-hook
 
 update_git_vars() {
   if git rev-parse --git-dir &>/dev/null; then
-    export groot=`git rev-parse --show-toplevel`
+    export CARROT_DIR=`git rev-parse --show-toplevel &>/dev/null`
+    export groot=`git rev-parse --show-toplevel &>/dev/null`
     export cb=$(git cb)
     export rb="origin/$cb"
     export ocb="origin/$cb"
