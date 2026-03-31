@@ -7,51 +7,45 @@
   $if(title)$<title>$title$</title>$else$<title>Document</title>$endif$
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <style>
     /* ── Tokens ─────────────────────────────── */
     :root {
-      --bg:        #07080f;
-      --surface:   #0d1020;
-      --surface2:  #131628;
-      --border:    #1e2545;
-      --border2:   #2a3460;
-      --text:      #cdd8f0;
-      --text2:     #7a90c0;
-      --text3:     #3f5280;
-      --accent:    #7c5ce8;
-      --accent2:   #a582f5;
-      --link:      #5b8de0;
-      --code-bg:   #090c18;
-      --code-text: #b8ccec;
-      --mark-bg:   rgba(124,92,232,0.18);
-      --radius:    4px;
-      --font-body: 'Lora', Georgia, 'Times New Roman', serif;
-      --font-head: 'Fraunces', 'Palatino Linotype', serif;
-      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-      --font1: 'Fraunces';
-      --font2: 'Palatino Linotype';
-      --font3: serif;
-      --font4: 'JetBrains Mono';
-      --font5: 'Fira Code';
-      --font6: 'Cascadia Code';
-      --font7: monospace;
+      /* iOS / macOS dark palette */
+      --bg:        #000000;
+      --surface:   #1c1c1e;
+      --surface2:  #2c2c2e;
+      --border:    #3a3a3c;
+      --border2:   #48484a;
+      --text:      #f2f2f7;
+      --text2:     #aeaeb2;
+      --text3:     #636366;
+      --accent:    #0a84ff;
+      --accent2:   #409cff;
+      --link:      #409cff;
+      --code-bg:   #1c1c1e;
+      --code-text: #e5e5ea;
+      --mark-bg:   rgba(10,132,255,0.15);
+      --radius:    10px;
+      --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-head: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       --max-w:     1200px;
       --sidebar-w: 240px;
     }
 
     /* ── Reset ───────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { font-size: 18pt; -webkit-font-smoothing: antialiased; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
 
     /* ── Page chrome ─────────────────────────── */
     body {
       background: var(--bg);
       color: var(--text);
       font-family: var(--font-body);
-      font-size: 18pt;
-      line-height: 1.75;
+      font-size: 1rem;
+      line-height: 1.65;
       min-height: 100vh;
     }
 
@@ -92,7 +86,7 @@
       text-decoration: none;
       display: block;
       padding: 0.2rem 0.5rem;
-      border-radius: var(--radius);
+      border-radius: 6px;
       transition: color 0.15s, background 0.15s;
     }
     .toc-index-link a:hover {
@@ -124,7 +118,7 @@
       color: var(--text2);
       text-decoration: none;
       padding: 0.3rem 0.5rem;
-      border-radius: var(--radius);
+      border-radius: 6px;
       border-left: 2px solid transparent;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
     }
@@ -166,11 +160,10 @@
       font-family: var(--font-head);
       font-size: clamp(1.8rem, 4vw, 2.8rem);
       font-weight: 700;
-      font-optical-sizing: auto;
       line-height: 1.2;
       color: var(--text);
       margin-bottom: 0.75rem;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
     }
 
     .doc-meta {
@@ -194,28 +187,24 @@
 
     /* Headings */
     article h1, article h2, article h3, article h4, article h5, article h6 {
-      font-family: var(--font3);
-      font-optical-sizing: auto;
+      font-family: var(--font-head);
       line-height: 1.25;
       color: var(--text);
-      margin-top: 20px;
-      margin-bottom: 20px;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      letter-spacing: -0.01em;
     }
-    article h1 { font-size: 2rem; font-weight: 700; }
+    article h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
     article h2 {
       font-size: 1.5rem;
       font-weight: 600;
       padding-bottom: 0.4rem;
       border-bottom: 1px solid var(--border);
+      letter-spacing: -0.02em;
     }
     article h3 { font-size: 1.3rem; font-weight: 600; color: var(--text2); }
     article h4 { font-size: 1.1rem; font-weight: 600; }
     article h5, article h6 { font-size: 0.9rem; font-weight: 500; color: var(--text2); }
-
-    article h1, article h2, article h3,
-    article h4, article h5, article h6 {
-      color: var(--text2);
-    }
 
     /* Anchor links on headings */
     article h1 a, article h2 a, article h3 a,
@@ -278,7 +267,7 @@
     article table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.9rem;
+      font-size: 0.875rem;
       margin-bottom: 1.5rem;
     }
     article thead tr { border-bottom: 2px solid var(--accent); }
@@ -286,8 +275,9 @@
       text-align: left;
       padding: 0.5rem 0.75rem;
       font-family: var(--font-mono);
-      font-size: 18pt;
+      font-size: 0.68rem;
       letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--text3);
     }
     article td {
@@ -304,7 +294,7 @@
       background: var(--code-bg);
       color: var(--accent2);
       padding: 0.15em 0.45em;
-      border-radius: var(--radius);
+      border-radius: 6px;
       border: 1px solid var(--border);
     }
 
@@ -313,14 +303,14 @@
       margin: 1.5rem 0;
       background: var(--code-bg) !important;
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: var(--radius);
       overflow-x: auto;
       position: relative;
     }
     article pre code {
       display: block;
       padding: 1.1rem 1.25rem;
-      font-size: 1rem;
+      font-size: 0.85rem;
       line-height: 1.65;
       background: transparent !important;
       color: var(--code-text);
@@ -345,7 +335,7 @@
     article img {
       max-width: 100%;
       height: auto;
-      border-radius: 6px;
+      border-radius: var(--radius);
       display: block;
       margin: 1.5rem auto;
     }
@@ -374,33 +364,32 @@
       background: var(--mark-bg);
       color: var(--accent2);
       padding: 0.1em 0.3em;
-      border-radius: 2px;
+      border-radius: 4px;
     }
 
     /* ── Syntax highlighting overrides ────────── */
-    /* Override pandoc breezedark to match warm palette */
     $if(highlighting-css)$
     $highlighting-css$
-    /* Warm overrides */
+    /* iOS-aligned overrides */
     pre.sourceCode, div.sourceCode pre { background: var(--code-bg) !important; }
-    code span.kw { color: #c792ea; font-weight: 500; }  /* keyword */
-    code span.cf { color: #b57de8; }                     /* control flow */
-    code span.dt { color: #7ec8e3; }                     /* data type */
-    code span.dv { color: #79b8ff; }                     /* decimal val */
-    code span.fl { color: #79b8ff; }                     /* float */
-    code span.co { color: #4a5e80; font-style: italic; } /* comment */
-    code span.st { color: #9ecbff; }                     /* string */
-    code span.op { color: #6fcff5; }                     /* operator */
-    code span.fu { color: #a582f5; }                     /* function */
+    code span.kw { color: #ff6b9d; font-weight: 500; }  /* keyword */
+    code span.cf { color: #ff6b9d; }                     /* control flow */
+    code span.dt { color: #5ac8fa; }                     /* data type */
+    code span.dv { color: #ff9f0a; }                     /* decimal val */
+    code span.fl { color: #ff9f0a; }                     /* float */
+    code span.co { color: #636366; font-style: italic; } /* comment */
+    code span.st { color: #30d158; }                     /* string */
+    code span.op { color: #5ac8fa; }                     /* operator */
+    code span.fu { color: #409cff; }                     /* function */
     code span.va { color: var(--code-text); }            /* variable */
-    code span.at { color: #7ec8e3; }                     /* attribute */
-    code span.an { color: #a582f5; }                     /* annotation */
-    code span.do { color: #4a5e80; font-style: italic; } /* doc comment */
-    code span.er { color: #ff7b8a; font-weight: 500; }   /* error */
-    code span.wa { color: #ff9e8a; }                     /* warning */
+    code span.at { color: #5ac8fa; }                     /* attribute */
+    code span.an { color: #ff9f0a; }                     /* annotation */
+    code span.do { color: #636366; font-style: italic; } /* doc comment */
+    code span.er { color: #ff453a; font-weight: 500; }   /* error */
+    code span.wa { color: #ff9f0a; }                     /* warning */
     $endif$
 
-    /* ── Light mode toggle ───────────────────── */
+    /* ── Theme toggle ───────────────────── */
     #theme-toggle {
       position: fixed;
       top: 1rem;
@@ -421,22 +410,22 @@
     }
     #theme-toggle:hover { background: var(--surface); color: var(--text); }
 
-    /* Light mode */
+    /* ── Light mode — Apple HIG ─────────────── */
     body.light {
-      --bg:        #f0f3fc;
-      --surface:   #e4eaf8;
-      --surface2:  #d6e0f4;
-      --border:    #b4c4e8;
-      --border2:   #98aedd;
-      --text:      #0c1228;
-      --text2:     #364878;
-      --text3:     #7888b0;
-      --accent:    #5a3ec8;
-      --accent2:   #7355e0;
-      --link:      #2e62c4;
-      --code-bg:   #e8eef8;
-      --code-text: #1a2448;
-      --mark-bg:   rgba(90,62,200,0.10);
+      --bg:        #f5f5f7;
+      --surface:   #ffffff;
+      --surface2:  #f5f5f7;
+      --border:    #d2d2d7;
+      --border2:   #c7c7cc;
+      --text:      #1d1d1f;
+      --text2:     #86868b;
+      --text3:     #aeaeb2;
+      --accent:    #0066cc;
+      --accent2:   #0077ed;
+      --link:      #0066cc;
+      --code-bg:   #f0f0f5;
+      --code-text: #1d1d1f;
+      --mark-bg:   rgba(0,102,204,0.10);
     }
 
     /* ── Footer ──────────────────────────────── */
