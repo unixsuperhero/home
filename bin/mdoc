@@ -1,0 +1,311 @@
+#!/usr/bin/env bash
+# mdoc — Convert a markdown file to styled HTML using pandoc,
+#         update ~/claude/index.html, and open in browser.
+#
+# Usage:
+#   mdoc <file.md>
+#   mdoc <file.md> --title "Custom Title" --desc "Brief description"
+#   mdoc <file.md> --toc
+#   echo "# Hello" | mdoc - --title "Piped Input"
+#
+# Options:
+#   -t, --title <str>   Override document title (default: first H1 or filename)
+#   -d, --desc  <str>   Short description shown in the index
+#       --toc           Inject a table of contents sidebar
+#       --open          Open after generation (default: yes, use --no-open to skip)
+
+set -euo pipefail
+
+CLAUDE_DIR="$HOME/claude"
+DOCS_DIR="$CLAUDE_DIR/docs"
+INDEX_JSON="$CLAUDE_DIR/index.json"
+INDEX_HTML="$CLAUDE_DIR/index.html"
+TEMPLATE="$HOME/.pandoc/templates/claude-docs.html"
+INDEX_TEMPLATE="$HOME/.pandoc/templates/claude-index.html"
+
+mkdir -p "$DOCS_DIR"
+
+# ── Argument parsing ──────────────────────────────────────────────────────────
+INPUT=""
+TITLE=""
+DESC=""
+TOC=false
+DO_OPEN=true
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -t|--title)   TITLE="$2"; shift 2 ;;
+    -d|--desc)    DESC="$2";  shift 2 ;;
+    --toc)        TOC=true;   shift   ;;
+    --no-open)    DO_OPEN=false; shift ;;
+    -*)           echo "Unknown flag: $1" >&2; exit 1 ;;
+    *)            INPUT="$1"; shift ;;
+  esac
+done
+
+if [[ -z "$INPUT" ]]; then
+  echo "Usage: mdoc <file.md> [--title 'Title'] [--desc 'Description'] [--toc]" >&2
+  exit 1
+fi
+
+# ── Handle stdin ──────────────────────────────────────────────────────────────
+TMPMD=""
+if [[ "$INPUT" == "-" ]]; then
+  TMPMD=$(mktemp /tmp/mdoc-XXXXXX.md)
+  # shellcheck disable=SC2064
+  trap "rm -f '$TMPMD'" EXIT
+  cat > "$TMPMD"
+  INPUT="$TMPMD"
+fi
+
+# ── Determine title ───────────────────────────────────────────────────────────
+if [[ -z "$TITLE" ]]; then
+  TITLE=$(awk '/^# /{sub(/^# /, ""); print; exit}' "$INPUT")
+  [[ -z "$TITLE" ]] && TITLE=$(basename "${INPUT%.md}")
+fi
+
+# ── Generate output path ──────────────────────────────────────────────────────
+DATE=$(date +%Y-%m-%d)
+SLUG=$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
+OUTFILE="$DOCS_DIR/${DATE}-${SLUG}.html"
+
+# ── Pre-process: ensure blank line before tables (fixes missing blank lines
+#    between inline elements like **Bold:** and a following | table row) ──────
+PROCESSED_MD=$(mktemp /tmp/mdoc-processed-XXXXXX.md)
+trap "rm -f '$PROCESSED_MD' ${TMPMD:-}" EXIT
+ruby -e '
+  lines = ARGF.readlines
+  out   = []
+  lines.each_with_index do |line, i|
+    prev = out.last
+    needs_blank = prev && !prev.strip.empty? &&
+      (
+        (line.start_with?("|") && !prev.start_with?("|")) ||
+        line.match?(/^#+\s/)
+      )
+    out << "\n" if needs_blank
+    out << line
+  end
+  print out.join
+' "$INPUT" > "$PROCESSED_MD"
+
+# ── Run pandoc ────────────────────────────────────────────────────────────────
+PANDOC_ARGS=(
+  "$PROCESSED_MD"
+  --template="$TEMPLATE"
+  --syntax-highlighting=breezedark
+  --metadata "title=$TITLE"
+  --metadata "date=$(date '+%B %-d, %Y')"
+  --standalone
+  --wrap=none
+  -o "$OUTFILE"
+)
+[[ "$TOC" == true ]] && PANDOC_ARGS+=(--toc --toc-depth=3)
+
+pandoc "${PANDOC_ARGS[@]}"
+echo "mdoc: generated $OUTFILE"
+
+# ── Update index ──────────────────────────────────────────────────────────────
+_mdoc_update_index() {
+python3 - <<PYEOF
+import json, os, sys
+from datetime import datetime
+
+claude_dir  = os.path.expanduser("$CLAUDE_DIR")
+docs_dir    = os.path.expanduser("$DOCS_DIR")
+index_json  = os.path.expanduser("$INDEX_JSON")
+index_html  = os.path.expanduser("$INDEX_HTML")
+index_tmpl  = os.path.expanduser("$INDEX_TEMPLATE")
+outfile     = "$OUTFILE"
+title       = """$TITLE"""
+date_str    = "$DATE"
+desc        = """$DESC"""
+
+rel = os.path.relpath(outfile, claude_dir)
+
+entry = {
+    "title": title,
+    "file":  rel,
+    "date":  date_str,
+    "desc":  desc,
+    "ts":    datetime.now().isoformat()
+}
+
+entries = []
+if os.path.exists(index_json):
+    try:
+        with open(index_json) as f:
+            entries = json.load(f)
+    except Exception:
+        entries = []
+
+# Prevent duplicate entries for same output file
+entries = [e for e in entries if e.get("file") != rel]
+entries.insert(0, entry)
+
+with open(index_json, "w") as f:
+    json.dump(entries, f, indent=2)
+
+# ── Regenerate index.html ─────────────────────────────────────────────────────
+rows = ""
+for e in entries:
+    t   = e.get("title", "Untitled")
+    f   = e.get("file",  "")
+    d   = e.get("date",  "")
+    de  = e.get("desc",  "")
+    rows += f"""
+      <tr>
+        <td class="date">{d}</td>
+        <td class="title"><a href="{f}">{t}</a>{f'<span class="desc">{de}</span>' if de else ''}</td>
+      </tr>"""
+
+now = datetime.now().strftime("%B %-d, %Y at %H:%M")
+count = len(entries)
+
+html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Docs Index</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    :root {{
+      --bg:      #0c0a08;
+      --surface: #141210;
+      --border:  #2d2820;
+      --text:    #e6ddd0;
+      --text2:   #9a9080;
+      --text3:   #5a5248;
+      --accent:  #c9832a;
+      --accent2: #e8a03e;
+      --radius:  4px;
+    }}
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    html {{ font-size: 16px; -webkit-font-smoothing: antialiased; }}
+    body {{
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Lora', Georgia, serif;
+      min-height: 100vh;
+      padding: 3rem 2rem 6rem;
+    }}
+    .wrap {{ max-width: 760px; margin: 0 auto; }}
+    header {{ margin-bottom: 3rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; }}
+    header h1 {{
+      font-family: 'Fraunces', serif;
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.4rem;
+    }}
+    header h1 span {{ color: var(--accent); }}
+    .meta {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text3);
+      letter-spacing: 0.06em;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+    }}
+    th {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text3);
+      text-align: left;
+      padding: 0 0.75rem 0.6rem;
+      border-bottom: 1px solid var(--accent);
+    }}
+    td {{
+      padding: 0.7rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }}
+    tr:hover td {{ background: #161310; }}
+    td.date {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text3);
+      white-space: nowrap;
+      width: 7rem;
+      padding-top: 0.8rem;
+    }}
+    td.title a {{
+      color: var(--text);
+      text-decoration: none;
+      font-size: 1rem;
+      display: block;
+      margin-bottom: 0.15rem;
+    }}
+    td.title a:hover {{ color: var(--accent2); }}
+    .desc {{
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text2);
+      margin-top: 0.1rem;
+      font-style: italic;
+    }}
+    .empty {{
+      text-align: center;
+      padding: 4rem 0;
+      color: var(--text3);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+    }}
+    ::-webkit-scrollbar {{ width: 6px; }}
+    ::-webkit-scrollbar-thumb {{ background: var(--border); border-radius: 3px; }}
+    body.light {{
+      --bg: #faf8f5; --surface: #f3f0eb; --border: #ddd8d0;
+      --text: #1a1510; --text2: #6a6258; --text3: #9a9088;
+      --accent: #b06e1a; --accent2: #c8821e;
+    }}
+    #toggle {{
+      position: fixed; top: 1rem; right: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text2); width: 2rem; height: 2rem;
+      border-radius: 50%; cursor: pointer; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center;
+    }}
+  </style>
+</head>
+<body>
+<button id="toggle" title="Toggle theme">◑</button>
+<div class="wrap">
+  <header>
+    <h1>Claude <span>Docs</span></h1>
+    <div class="meta">
+      {count} document{'s' if count != 1 else ''} &nbsp;·&nbsp; last updated {now}
+    </div>
+  </header>
+  {'<table><thead><tr><th>Date</th><th>Document</th></tr></thead><tbody>' + rows + '</tbody></table>' if entries else '<div class="empty">No documents yet.</div>'}
+</div>
+<script>
+  const t = document.getElementById('toggle');
+  if (localStorage.getItem('mdoc-theme') === 'light') document.body.classList.add('light');
+  t.addEventListener('click', () => {{
+    document.body.classList.toggle('light');
+    localStorage.setItem('mdoc-theme', document.body.classList.contains('light') ? 'light' : 'dark');
+  }});
+</script>
+</body>
+</html>"""
+
+with open(index_html, "w") as f:
+    f.write(html)
+
+print(f"mdoc: index updated ({count} docs) → {index_html}")
+PYEOF
+}
+
+_mdoc_update_index
+
+# ── Open ──────────────────────────────────────────────────────────────────────
+if [[ "$DO_OPEN" == true ]]; then
+  open "$OUTFILE"
+fi
