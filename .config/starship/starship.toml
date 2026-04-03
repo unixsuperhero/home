@@ -1,7 +1,7 @@
 # Don't print a new line at the start of the prompt
 # add_newline = true
 
-format = """$time ${custom.worktree}$directory${custom.tmux}$git_branch$git_status$ruby$cmd_duration$line_break$character"""
+format = """$time $git_commit${custom.worktree}$directory${custom.tmux}$git_branch$git_status$ruby$cmd_duration$line_break$character"""
 
 # makes prompt a single line
 # [line_break]
@@ -29,6 +29,12 @@ disabled = false
 [ruby]
 disabled = false
 
+[git_commit]
+commit_hash_length = 8
+format = '[$hash$tag ]($style)'
+style = 'bold red'
+only_detached = false
+
 [git_status]
 stashed = ''
 format = '[$staged](green)[$conflicted$stashed$deleted$renamed$modified$untracked](red)'
@@ -46,7 +52,7 @@ format = "[$time]($style)"
 description = "Current tmux session name"
 command = "tmux display-message -p '#S'"
 when = '[ -n "$TMUX" ]'
-format = "[t> $output]($style) "
+format = "[ $output]($style) "
 style = "bold yellow"
 
 # Show worktree name when inside a linked git worktree (not the main worktree)
@@ -59,11 +65,11 @@ format = "[$output]($style)/"
 style = "bold cyan"
 
 [directory]
-# truncation_length = 8
+truncation_length = 8
 truncate_to_repo = false
 substitutions = {
-  "/Users/josh/work/" = "~w/",
-  "/Users/josh/proj/" = "~p/",
-  "~/work/" = "~w/",
-  "~/proj/" = "~p/",
+  "/Users/josh/work/" = " ",
+  "/Users/josh/proj/" = " ",
+  "~/work/" = " ",
+  "~/proj/" = " ",
 }
