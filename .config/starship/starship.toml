@@ -1,6 +1,8 @@
 # Don't print a new line at the start of the prompt
 # add_newline = true
 
+format = """$time$custom.tmux $custom.worktree$directory$git_branch$git_status$ruby$cmd_duration$line_break$character"""
+
 # makes prompt a single line
 # [line_break]
 # disabled = false
@@ -51,5 +53,10 @@ style = "bold yellow"
 description = "Git worktree name"
 command = "basename $(git rev-parse --show-toplevel)"
 when = 'git rev-parse --git-dir 2>/dev/null | grep -q "worktrees"'
-format = "[worktree:$output]($style) "
+format = "[$output]($style)/"
 style = "bold cyan"
+
+[directory]
+truncation_length = 8
+truncate_to_repo = false
+substitutions = {"/Users/josh/work/" = "", "/Users/josh/proj/" = ""}
