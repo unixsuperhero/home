@@ -1,7 +1,7 @@
 # Don't print a new line at the start of the prompt
 # add_newline = true
 
-format = """$time$custom.tmux $custom.worktree$directory$git_branch$git_status$ruby$cmd_duration$line_break$character"""
+format = """$time ${custom.worktree}$directory${custom.tmux}$git_branch$git_status$ruby$cmd_duration$line_break$character"""
 
 # makes prompt a single line
 # [line_break]
@@ -16,28 +16,29 @@ min_time = 100_000  # Show command duration over 10,000 milliseconds (= 10 sec)
 format = "took [$duration]($style)"
 
 [character]
-error_symbol = "[❯](bold red)"
+error_symbol = "[x❯](bold red)"
+success_symbol = "[ ❯](bold green)"
 
 # Clear visibility for exit codes
 [status]
 disabled = true
 
 [nodejs]
-disabled = true
+disabled = false
 
 [ruby]
 disabled = false
 
 [git_status]
 stashed = ''
-format = '(\([$staged](green)[$conflicted$stashed$deleted$renamed$modified$untracked](red)\) )'
+format = '[$staged](green)[$conflicted$stashed$deleted$renamed$modified$untracked](red)'
 
 [git_branch]
 format = '[$symbol$branch(:$remote_branch)]($style) '
 
 [time]
 disabled = false
-time_format = '%Y-%m-%d %H:%M:%S '
+time_format = '%Y%m%d %H%M%S'
 format = "[$time]($style)"
 
 # Show tmux session name when inside a tmux session
@@ -45,11 +46,12 @@ format = "[$time]($style)"
 description = "Current tmux session name"
 command = "tmux display-message -p '#S'"
 when = '[ -n "$TMUX" ]'
-format = "[tmux:$output]($style) "
+format = "[t> $output]($style) "
 style = "bold yellow"
 
 # Show worktree name when inside a linked git worktree (not the main worktree)
 [custom.worktree]
+disabled = true
 description = "Git worktree name"
 command = "basename $(git rev-parse --show-toplevel)"
 when = 'git rev-parse --git-dir 2>/dev/null | grep -q "worktrees"'
@@ -57,6 +59,11 @@ format = "[$output]($style)/"
 style = "bold cyan"
 
 [directory]
-truncation_length = 8
+# truncation_length = 8
 truncate_to_repo = false
-substitutions = {"/Users/josh/work/" = "", "/Users/josh/proj/" = ""}
+substitutions = {
+  "/Users/josh/work/" = "~w/",
+  "/Users/josh/proj/" = "~p/",
+  "~/work/" = "~w/",
+  "~/proj/" = "~p/",
+}
