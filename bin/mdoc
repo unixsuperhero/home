@@ -6,13 +6,15 @@
 #   mdoc <file.md>
 #   mdoc <file.md> --title "Custom Title" --desc "Brief description"
 #   mdoc <file.md> --toc
+#   mdoc <file.md> --recursive
 #   echo "# Hello" | mdoc - --title "Piped Input"
 #
 # Options:
 #   -t, --title <str>   Override document title (default: first H1 or filename)
 #   -d, --desc  <str>   Short description shown in the index
 #       --toc           Inject a table of contents sidebar
-#       --open          Open after generation (default: yes, use --no-open to skip)
+#       --no-open       Skip opening in browser
+#   -r, --recursive     Follow and convert all linked .md files transitively
 
 set -euo pipefail
 
@@ -21,7 +23,6 @@ DOCS_DIR="$CLAUDE_DIR/docs"
 INDEX_JSON="$CLAUDE_DIR/index.json"
 INDEX_HTML="$CLAUDE_DIR/index.html"
 TEMPLATE="$HOME/.pandoc/templates/claude-docs.html"
-INDEX_TEMPLATE="$HOME/.pandoc/templates/claude-index.html"
 
 mkdir -p "$DOCS_DIR"
 
@@ -31,95 +32,120 @@ TITLE=""
 DESC=""
 TOC=false
 DO_OPEN=true
+RECURSIVE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -t|--title)   TITLE="$2"; shift 2 ;;
-    -d|--desc)    DESC="$2";  shift 2 ;;
-    --toc)        TOC=true;   shift   ;;
-    --no-open)    DO_OPEN=false; shift ;;
-    -*)           echo "Unknown flag: $1" >&2; exit 1 ;;
-    *)            INPUT="$1"; shift ;;
+    -t|--title)     TITLE="$2";     shift 2 ;;
+    -d|--desc)      DESC="$2";      shift 2 ;;
+    --toc)          TOC=true;       shift   ;;
+    --no-open)      DO_OPEN=false;  shift   ;;
+    -r|--recursive) RECURSIVE=true; shift   ;;
+    -*)             echo "Unknown flag: $1" >&2; exit 1 ;;
+    *)              INPUT="$1";     shift   ;;
   esac
 done
 
 if [[ -z "$INPUT" ]]; then
-  echo "Usage: mdoc <file.md> [--title 'Title'] [--desc 'Description'] [--toc]" >&2
+  echo "Usage: mdoc <file.md> [--title 'Title'] [--desc 'Description'] [--toc] [--recursive]" >&2
   exit 1
 fi
 
+DATE=$(date +%Y-%m-%d)
+
+# Collect temp files for cleanup on exit
+CLEANUP_FILES=()
+trap '[[ ${#CLEANUP_FILES[@]} -gt 0 ]] && rm -f "${CLEANUP_FILES[@]}" 2>/dev/null; true' EXIT
+
 # ── Handle stdin ──────────────────────────────────────────────────────────────
-TMPMD=""
 if [[ "$INPUT" == "-" ]]; then
+  if [[ "$RECURSIVE" == true ]]; then
+    echo "mdoc: --recursive is not supported with stdin input" >&2
+    exit 1
+  fi
   TMPMD=$(mktemp /tmp/mdoc-XXXXXX.md)
-  # shellcheck disable=SC2064
-  trap "rm -f '$TMPMD'" EXIT
+  CLEANUP_FILES+=("$TMPMD")
   cat > "$TMPMD"
   INPUT="$TMPMD"
 fi
 
-# ── Determine title ───────────────────────────────────────────────────────────
-if [[ -z "$TITLE" ]]; then
-  TITLE=$(awk '/^# /{sub(/^# /, ""); print; exit}' "$INPUT")
-  [[ -z "$TITLE" ]] && TITLE=$(basename "${INPUT%.md}")
-fi
+# ── Helper: extract first H1 title from a markdown file ──────────────────────
+_mdoc_get_title() {
+  local t
+  t=$(awk '/^# /{sub(/^# /, ""); print; exit}' "$1")
+  [[ -z "$t" ]] && t=$(basename "${1%.md}")
+  printf '%s' "$t"
+}
 
-# ── Generate output path ──────────────────────────────────────────────────────
-DATE=$(date +%Y-%m-%d)
-SLUG=$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
-OUTFILE="$DOCS_DIR/${DATE}-${SLUG}.html"
+# ── Helper: title → URL slug ──────────────────────────────────────────────────
+_mdoc_slug() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//'
+}
 
-# ── Pre-process: ensure blank line before tables (fixes missing blank lines
-#    between inline elements like **Bold:** and a following | table row) ──────
-PROCESSED_MD=$(mktemp /tmp/mdoc-processed-XXXXXX.md)
-trap "rm -f '$PROCESSED_MD' ${TMPMD:-}" EXIT
-ruby -e '
-  lines = ARGF.readlines
-  out   = []
-  lines.each_with_index do |line, i|
-    prev = out.last
-    needs_blank = prev && !prev.strip.empty? &&
-      (
-        (line.start_with?("|") && !prev.start_with?("|")) ||
-        line.match?(/^#+\s/)
-      )
-    out << "\n" if needs_blank
-    out << line
-  end
-  print out.join
-' "$INPUT" > "$PROCESSED_MD"
+# ── Helper: preprocess markdown (ensures blank lines before tables/headings) ──
+_mdoc_preprocess() {
+  local src="$1" dst="$2"
+  ruby -e '
+    lines = ARGF.readlines
+    out   = []
+    lines.each_with_index do |line, i|
+      prev = out.last
+      needs_blank = prev && !prev.strip.empty? &&
+        (
+          (line.start_with?("|") && !prev.start_with?("|")) ||
+          line.match?(/^#+\s/)
+        )
+      out << "\n" if needs_blank
+      out << line
+    end
+    print out.join
+  ' "$src" > "$dst"
+}
 
-# ── Run pandoc ────────────────────────────────────────────────────────────────
-PANDOC_ARGS=(
-  "$PROCESSED_MD"
-  --template="$TEMPLATE"
-  --syntax-highlighting=breezedark
-  --metadata "title=$TITLE"
-  --metadata "date=$(date '+%B %-d, %Y')"
-  --standalone
-  --wrap=none
-  -o "$OUTFILE"
-)
-[[ "$TOC" == true ]] && PANDOC_ARGS+=(--toc --toc-depth=3)
+# ── Helper: run pandoc on a preprocessed file ─────────────────────────────────
+# Args: src outfile title [lua_filter] [input_dir]
+_mdoc_pandoc() {
+  local src="$1" outfile="$2" title="$3" lua_filter="${4:-}" input_dir="${5:-}"
 
-pandoc "${PANDOC_ARGS[@]}"
-echo "mdoc: generated $OUTFILE"
+  local args=(
+    "$src"
+    --template="$TEMPLATE"
+    --syntax-highlighting=breezedark
+    --metadata "title=$title"
+    --metadata "date=$(date '+%B %-d, %Y')"
+    --standalone
+    --wrap=none
+    -o "$outfile"
+  )
+  [[ "$TOC"           == true ]] && args+=(--toc --toc-depth=3)
+  [[ -n "$lua_filter"         ]] && args+=(--lua-filter="$lua_filter")
+  [[ -n "$input_dir"          ]] && args+=(--metadata "input_dir=$input_dir")
 
-# ── Update index ──────────────────────────────────────────────────────────────
+  pandoc "${args[@]}"
+}
+
+# ── Helper: update index.json and regenerate index.html ──────────────────────
+# Reads all values from environment variables (MDOC_*) so it's callable
+# per-file in loops without heredoc interpolation issues.
 _mdoc_update_index() {
-python3 - <<PYEOF
-import json, os, sys
+  MDOC_OUTFILE="$1" \
+  MDOC_TITLE="$2" \
+  MDOC_DESC="${3:-}" \
+  MDOC_DATE="$DATE" \
+  MDOC_CLAUDE_DIR="$CLAUDE_DIR" \
+  MDOC_INDEX_JSON="$INDEX_JSON" \
+  MDOC_INDEX_HTML="$INDEX_HTML" \
+  python3 - <<'PYEOF'
+import json, os
 from datetime import datetime
 
-claude_dir  = os.path.expanduser("$CLAUDE_DIR")
-docs_dir    = os.path.expanduser("$DOCS_DIR")
-index_json  = os.path.expanduser("$INDEX_JSON")
-index_html  = os.path.expanduser("$INDEX_HTML")
-index_tmpl  = os.path.expanduser("$INDEX_TEMPLATE")
-outfile     = "$OUTFILE"
-title       = """$TITLE"""
-date_str    = "$DATE"
-desc        = """$DESC"""
+outfile    = os.environ['MDOC_OUTFILE']
+title      = os.environ['MDOC_TITLE']
+desc       = os.environ['MDOC_DESC']
+date_str   = os.environ['MDOC_DATE']
+claude_dir = os.environ['MDOC_CLAUDE_DIR']
+index_json = os.environ['MDOC_INDEX_JSON']
+index_html = os.environ['MDOC_INDEX_HTML']
 
 rel = os.path.relpath(outfile, claude_dir)
 
@@ -139,27 +165,26 @@ if os.path.exists(index_json):
     except Exception:
         entries = []
 
-# Prevent duplicate entries for same output file
 entries = [e for e in entries if e.get("file") != rel]
 entries.insert(0, entry)
 
 with open(index_json, "w") as f:
     json.dump(entries, f, indent=2)
 
-# ── Regenerate index.html ─────────────────────────────────────────────────────
+# ── Regenerate index.html ──────────────────────────────────────────────────────
 rows = ""
 for e in entries:
-    t   = e.get("title", "Untitled")
-    f   = e.get("file",  "")
-    d   = e.get("date",  "")
-    de  = e.get("desc",  "")
+    t  = e.get("title", "Untitled")
+    f  = e.get("file",  "")
+    d  = e.get("date",  "")
+    de = e.get("desc",  "")
     rows += f"""
       <tr>
         <td class="date">{d}</td>
         <td class="title"><a href="{f}">{t}</a>{f'<span class="desc">{de}</span>' if de else ''}</td>
       </tr>"""
 
-now = datetime.now().strftime("%B %-d, %Y at %H:%M")
+now   = datetime.now().strftime("%B %-d, %Y at %H:%M")
 count = len(entries)
 
 html = f"""<!DOCTYPE html>
@@ -275,7 +300,7 @@ html = f"""<!DOCTYPE html>
   </style>
 </head>
 <body>
-<button id="toggle" title="Toggle theme">◑</button>
+<button id="toggle" title="Toggle theme">&#9681;</button>
 <div class="wrap">
   <header>
     <h1>Claude <span>Docs</span></h1>
@@ -303,9 +328,203 @@ print(f"mdoc: index updated ({count} docs) → {index_html}")
 PYEOF
 }
 
-_mdoc_update_index
+# ── Helper: convert a single file (preprocess + pandoc + index update) ────────
+# Args: input_abs title desc [lua_filter]
+# Prints the output HTML path.
+_mdoc_convert_file() {
+  local input_abs="$1" title="$2" desc="$3" lua_filter="${4:-}"
+  local input_dir slug outfile processed
+
+  input_dir=$(dirname "$input_abs")
+  slug=$(_mdoc_slug "$title")
+  outfile="$DOCS_DIR/${DATE}-${slug}.html"
+
+  processed=$(mktemp /tmp/mdoc-processed-XXXXXX.md)
+  CLEANUP_FILES+=("$processed")
+
+  _mdoc_preprocess "$input_abs" "$processed"
+  _mdoc_pandoc "$processed" "$outfile" "$title" "$lua_filter" "$input_dir"
+  echo "mdoc: generated $outfile" >&2
+
+  _mdoc_update_index "$outfile" "$title" "$desc"
+
+  printf '%s' "$outfile"
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── Recursive helpers ─────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+# BFS over markdown link graph; prints one absolute path per line.
+_mdoc_collect_files() {
+  python3 - "$1" <<'PYEOF'
+import sys, os, re
+
+def collect(root):
+    root = os.path.abspath(root)
+    seen, queue, ordered = set(), [root], []
+    while queue:
+        path = os.path.normpath(queue.pop(0))
+        if path in seen or not os.path.isfile(path):
+            continue
+        seen.add(path)
+        ordered.append(path)
+        base = os.path.dirname(path)
+        with open(path, errors='replace') as f:
+            content = f.read()
+        for m in re.finditer(r'\[[^\]]*\]\(([^)#\s]+\.md)(?:#[^)]*)?\)', content):
+            link = m.group(1)
+            if link.startswith(('http://', 'https://', 'mailto:')):
+                continue
+            queue.append(os.path.normpath(os.path.join(base, link)))
+    return ordered
+
+for f in collect(sys.argv[1]):
+    print(f)
+PYEOF
+}
+
+# Given a list of absolute .md paths, returns JSON mapping each path to its
+# output HTML filename (just the basename, since all outputs land in DOCS_DIR).
+_mdoc_build_link_map() {
+  python3 - "$DATE" "$@" <<'PYEOF'
+import sys, os, re, json
+
+date  = sys.argv[1]
+files = sys.argv[2:]
+
+def get_title(path):
+    with open(path, errors='replace') as f:
+        for line in f:
+            m = re.match(r'^# (.+)', line)
+            if m:
+                return m.group(1).strip()
+    return os.path.splitext(os.path.basename(path))[0]
+
+def make_slug(title):
+    s = re.sub(r'[^a-z0-9]+', '-', title.lower())
+    return s.strip('-')
+
+result = {}
+for path in files:
+    slug = make_slug(get_title(path))
+    result[path] = f"{date}-{slug}.html"
+
+print(json.dumps(result))
+PYEOF
+}
+
+# Writes a Lua filter to $1 that rewrites .md links to their HTML equivalents.
+# The map (abs_src_path → output_filename) is baked in as a Lua table.
+_mdoc_write_lua_filter() {
+  local outfile="$1" link_map_json="$2"
+  python3 - "$outfile" "$link_map_json" <<'PYEOF'
+import sys, json
+
+outfile      = sys.argv[1]
+link_map     = json.loads(sys.argv[2])
+
+map_lines = ['local map = {}']
+for src, dst in link_map.items():
+    s = src.replace('\\', '\\\\').replace('"', '\\"')
+    d = dst.replace('\\', '\\\\').replace('"', '\\"')
+    map_lines.append(f'map["{s}"] = "{d}"')
+
+lua = r"""
+local input_dir = ""
+
+-- Pure-Lua path normalizer: handles ../ and ./ without shell calls
+local function normalize(path)
+  local parts, is_abs = {}, path:sub(1,1) == "/"
+  for part in path:gmatch("[^/]+") do
+    if part == ".." and #parts > 0 then
+      table.remove(parts)
+    elseif part ~= "." and part ~= "" then
+      table.insert(parts, part)
+    end
+  end
+  local result = table.concat(parts, "/")
+  return is_abs and ("/" .. result) or result
+end
+
+function Meta(m)
+  if m.input_dir then
+    input_dir = pandoc.utils.stringify(m.input_dir)
+    if input_dir:sub(-1) ~= "/" then input_dir = input_dir .. "/" end
+    m.input_dir = nil  -- don't leak into output
+  end
+  return m
+end
+
+function Link(el)
+  local target = el.target
+  -- Skip external links and pure anchors
+  if target:match("^https?://") or target:match("^mailto:") or target:match("^#") then
+    return el
+  end
+  -- Separate path from anchor fragment
+  local path, anchor = target:match("^(.-)(%#.*)$")
+  if not path then path = target; anchor = "" end
+  -- Only rewrite .md links
+  if not path:match("%.md$") then return el end
+  -- Resolve to absolute path
+  local abs_path = path:sub(1,1) == "/" and normalize(path)
+                                         or normalize(input_dir .. path)
+  if map[abs_path] then
+    el.target = map[abs_path] .. anchor
+    return el
+  end
+  return el
+end
+"""
+
+with open(outfile, 'w') as f:
+    f.write('\n'.join(map_lines))
+    f.write(lua)
+PYEOF
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── Main flow ─────────────────────────────────════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+
+OUTFILE=""
+
+if [[ "$RECURSIVE" == true ]]; then
+  INPUT_ABS=$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")
+
+  echo "mdoc: collecting linked .md files from $INPUT_ABS ..."
+  mapfile -t ALL_FILES < <(_mdoc_collect_files "$INPUT_ABS")
+  echo "mdoc: found ${#ALL_FILES[@]} file(s)"
+
+  # Build map: abs_path → output html filename
+  LINK_MAP_JSON=$(_mdoc_build_link_map "${ALL_FILES[@]}")
+
+  # Write Lua filter with map baked in
+  LUA_FILTER=$(mktemp /tmp/mdoc-links-XXXXXX.lua)
+  CLEANUP_FILES+=("$LUA_FILTER")
+  _mdoc_write_lua_filter "$LUA_FILTER" "$LINK_MAP_JSON"
+
+  for file in "${ALL_FILES[@]}"; do
+    file_title=$(_mdoc_get_title "$file")
+    file_desc=""
+    # Apply user-supplied title/desc only to the root file
+    if [[ "$file" == "$INPUT_ABS" ]]; then
+      [[ -n "$TITLE" ]] && file_title="$TITLE"
+      file_desc="$DESC"
+    fi
+    out=$(_mdoc_convert_file "$file" "$file_title" "$file_desc" "$LUA_FILTER")
+    [[ "$file" == "$INPUT_ABS" ]] && OUTFILE="$out"
+  done
+
+else
+  # ── Single-file mode (original behavior) ────────────────────────────────────
+  INPUT_ABS=$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")
+  [[ -z "$TITLE" ]] && TITLE=$(_mdoc_get_title "$INPUT_ABS")
+  OUTFILE=$(_mdoc_convert_file "$INPUT_ABS" "$TITLE" "$DESC")
+fi
 
 # ── Open ──────────────────────────────────────────────────────────────────────
-if [[ "$DO_OPEN" == true ]]; then
+if [[ "$DO_OPEN" == true ]] && [[ -n "$OUTFILE" ]]; then
   open "$OUTFILE"
 fi
