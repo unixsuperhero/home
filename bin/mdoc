@@ -77,11 +77,6 @@ _mdoc_get_title() {
   printf '%s' "$t"
 }
 
-# ── Helper: title → URL slug ──────────────────────────────────────────────────
-_mdoc_slug() {
-  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//'
-}
-
 # ── Helper: preprocess markdown (ensures blank lines before tables/headings) ──
 _mdoc_preprocess() {
   local src="$1" dst="$2"
@@ -333,11 +328,10 @@ PYEOF
 # Prints the output HTML path.
 _mdoc_convert_file() {
   local input_abs="$1" title="$2" desc="$3" lua_filter="${4:-}"
-  local input_dir slug outfile processed
+  local input_dir outfile processed
 
   input_dir=$(dirname "$input_abs")
-  slug=$(_mdoc_slug "$title")
-  outfile="$DOCS_DIR/${DATE}-${slug}.html"
+  outfile="$DOCS_DIR/$(basename "${input_abs%.md}").html"
 
   processed=$(mktemp /tmp/mdoc-processed-XXXXXX.md)
   CLEANUP_FILES+=("$processed")
@@ -387,28 +381,14 @@ PYEOF
 # Given a list of absolute .md paths, returns JSON mapping each path to its
 # output HTML filename (just the basename, since all outputs land in DOCS_DIR).
 _mdoc_build_link_map() {
-  python3 - "$DATE" "$@" <<'PYEOF'
-import sys, os, re, json
+  python3 - "$@" <<'PYEOF'
+import sys, os, json
 
-date  = sys.argv[1]
-files = sys.argv[2:]
-
-def get_title(path):
-    with open(path, errors='replace') as f:
-        for line in f:
-            m = re.match(r'^# (.+)', line)
-            if m:
-                return m.group(1).strip()
-    return os.path.splitext(os.path.basename(path))[0]
-
-def make_slug(title):
-    s = re.sub(r'[^a-z0-9]+', '-', title.lower())
-    return s.strip('-')
+files = sys.argv[1:]
 
 result = {}
 for path in files:
-    slug = make_slug(get_title(path))
-    result[path] = f"{date}-{slug}.html"
+    result[path] = os.path.splitext(os.path.basename(path))[0] + ".html"
 
 print(json.dumps(result))
 PYEOF
@@ -497,7 +477,7 @@ if [[ "$RECURSIVE" == true ]]; then
   mapfile -t ALL_FILES < <(_mdoc_collect_files "$INPUT_ABS")
   echo "mdoc: found ${#ALL_FILES[@]} file(s)"
 
-  # Build map: abs_path → output html filename
+  # Build map: abs_path → output html filename (basename.html)
   LINK_MAP_JSON=$(_mdoc_build_link_map "${ALL_FILES[@]}")
 
   # Write Lua filter with map baked in
