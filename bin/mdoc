@@ -15,6 +15,7 @@
 #       --toc           Inject a table of contents sidebar
 #       --no-open       Skip opening in browser
 #   -r, --recursive     Follow and convert all linked .md files transitively
+#       --no-date       Omit date prefix from output filename (default: no date)
 
 set -euo pipefail
 
@@ -40,6 +41,7 @@ while [[ $# -gt 0 ]]; do
     -d|--desc)      DESC="$2";      shift 2 ;;
     --toc)          TOC=true;       shift   ;;
     --no-open)      DO_OPEN=false;  shift   ;;
+    --no-date)                      shift   ;;  # date-prefix already off by default
     -r|--recursive) RECURSIVE=true; shift   ;;
     -*)             echo "Unknown flag: $1" >&2; exit 1 ;;
     *)              INPUT="$1";     shift   ;;
@@ -345,6 +347,21 @@ _mdoc_convert_file() {
   printf '%s' "$outfile"
 }
 
+# Writes a simple Lua filter that rewrites local .md links → .html.
+# Used in single-file mode (no map needed since output has no date prefix).
+_mdoc_write_simple_lua_filter() {
+  cat > "$1" <<'LUA'
+function Link(el)
+  local t = el.target
+  if t:match("^https?://") or t:match("^mailto:") or t:match("^#") then
+    return el
+  end
+  el.target = t:gsub("%.md(#?.*)$", ".html%1")
+  return el
+end
+LUA
+}
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ── Recursive helpers ─────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
@@ -498,10 +515,15 @@ if [[ "$RECURSIVE" == true ]]; then
   done
 
 else
-  # ── Single-file mode (original behavior) ────────────────────────────────────
+  # ── Single-file mode ────────────────────────────────────────────────────────
   INPUT_ABS=$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")
   [[ -z "$TITLE" ]] && TITLE=$(_mdoc_get_title "$INPUT_ABS")
-  OUTFILE=$(_mdoc_convert_file "$INPUT_ABS" "$TITLE" "$DESC")
+
+  LUA_FILTER=$(mktemp /tmp/mdoc-links-XXXXXX.lua)
+  CLEANUP_FILES+=("$LUA_FILTER")
+  _mdoc_write_simple_lua_filter "$LUA_FILTER"
+
+  OUTFILE=$(_mdoc_convert_file "$INPUT_ABS" "$TITLE" "$DESC" "$LUA_FILTER")
 fi
 
 # ── Open ──────────────────────────────────────────────────────────────────────
